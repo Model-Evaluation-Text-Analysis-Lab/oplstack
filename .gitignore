@@ -26,6 +26,8 @@ __pycache__/
 *.exe
 *.bundle
 
+credentials.yml
+
 # Ignore common development environment and configuration files
 .idea/
 .vscode/
