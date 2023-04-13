@@ -1,0 +1,43 @@
+# Ignore common operating system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore common temporary and build files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+*.pyc
+*.pyo
+*.pyd
+*.pyc~
+__pycache__/
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+*.bundle
+
+# Ignore common development environment and configuration files
+.idea/
+.vscode/
+*.sln
+*.suo
+*.sublime-project
+*.sublime-workspace
+
+# Ignore common package and dependency directories
+node_modules/
+bower_components/
+venv/
+*.egg-info/
+dist/
+build/
