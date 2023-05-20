@@ -34,6 +34,8 @@ __pycache__/
 *.sublime-project
 *.sublime-workspace
 
+credentials.yml
+
 # Ignore common package and dependency directories
 node_modules/
 bower_components/
