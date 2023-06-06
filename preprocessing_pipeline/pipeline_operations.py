@@ -23,6 +23,19 @@ class Attribute:
     name: str
     value: str
     type: str
+    source: str
+    
+def load_document(file_path):
+    _, file_extension = os.path.splitext(file_path)
+    file_extension = file_extension.lower()
+
+    if file_extension == '.pdf':
+        return load_pdf(file_path)
+    elif file_extension == '.html':
+        pass
+        #return load_html(file_path)
+    else:
+        raise NotImplementedError(f"Loading documents of type {file_extension} is not supported.")
 
 def load_pdf(file_path):
     with open(file_path, 'rb') as file:
@@ -56,12 +69,8 @@ def store_chunks_in_db(chunks, db_path, embeds_folder_path):
             content=chunk,
             attributes=attributes
         )
-        embedding = model.encode(chunk)
-        np.save(f"{embeds_folder_path}/{node_id}.npy", embedding)  # save embeddings as .npy files
         
         node_dict = {'node': asdict(node)}
-        assert 'embedding' not in node_dict['node'].keys(), 'Embedding found in node dictionary.'
-        
         db[node_id] = json.dumps(node_dict).encode('utf-8')
 
         if prev_node_id is not None:
@@ -74,10 +83,34 @@ def store_chunks_in_db(chunks, db_path, embeds_folder_path):
 
     db.close()
 
-pdf_filepath = 'preprocessing_pipeline/sample.pdf'
+def embed_chunks(db_path, embeds_folder_path):
+    
+    db = rocksdict.Rdict(db_path)
+    for k, v in db.items():
+        node_dict = json.loads(v.decode('utf-8'))['node']  # no 'embed' in the dictionary anymore
+        node = Node(**node_dict)
+
+        embedding = model.encode(node.content)
+        np.save(f"{embeds_folder_path}/{k}.npy", embedding)  # save embeddings as .npy files
+        
+        node_dict = {'node': asdict(node)}
+        assert 'embedding' not in node_dict['node'].keys(), 'Embedding found in node dictionary.'
+
+def execute_pipeline(document_filepath, db_filepath, embeds_folder_path):
+    # 1. Load Document
+    text = load_document(document_filepath)
+    # 2. Index document into chunks
+    chunks = split_text_into_chunks(text)
+    # 3. Store grpah in rocsDB
+    store_chunks_in_db(chunks, db_filepath, embeds_folder_path)
+    # 4. Generate vector embeds fro chunks and store in vectore store
+    embed_chunks(db_filepath, embeds_folder_path)
+
+# Specify the file paths
+document_filepath = 'preprocessing_pipeline/sample.pdf'
 db_filepath = 'preprocessing_pipeline/test_dict'
-embeds_folder_path = 'preprocessing_pipeline/embeds_test'
-text = load_pdf(pdf_filepath)
-chunks = split_text_into_chunks(text)
-store_chunks_in_db(chunks, db_filepath, embeds_folder_path)
+embeds_folder_path = 'preprocessing_pipeline/vector_store'
+
+# Execute the pipeline
+execute_pipeline(document_filepath, db_filepath, embeds_folder_path)
 
