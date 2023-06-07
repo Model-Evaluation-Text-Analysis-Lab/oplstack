@@ -3,6 +3,7 @@ from document_loader import *
 
 def execute_pipeline(document_filepath, db_filepath, embeds_folder_path):
     data = load_document(document_filepath)
+    print(data)
     store_chunks_in_db(data, db_filepath, embeds_folder_path)
     embed_chunks_in_groups(db_filepath, embeds_folder_path)
 

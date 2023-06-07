@@ -7,7 +7,6 @@ from pdfminer.high_level import extract_text
 from typing import Dict, List, Optional, Union
 from nltk.tokenize import sent_tokenize
 import sentence_transformers
-import fitz  # PyMuPDF
 from datatypes import *
 from dataclasses import asdict
 

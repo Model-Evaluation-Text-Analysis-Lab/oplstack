@@ -1,4 +1,6 @@
 from pipeline_operations import split_text_into_chunks
+import os
+import fitz  # PyMuPDF
 
 def extract_text_from_pdf_page(page):
     """Extract and chunk text from a PDF page."""
