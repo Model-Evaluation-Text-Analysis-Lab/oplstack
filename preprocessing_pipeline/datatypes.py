@@ -9,6 +9,7 @@ class Attribute:
 
 @dataclass
 class Edge:
+    id: str  # Added id field
     source: str
     target: str
     type: str
@@ -20,5 +21,5 @@ class Node:
     content: str
     type: str
     attributes: Dict[str, Attribute]
-    edges: List[Edge]
+    edges: List[str]  # Instead of storing edges directly, store edge IDs
     parent_id: Union[str, None] = None

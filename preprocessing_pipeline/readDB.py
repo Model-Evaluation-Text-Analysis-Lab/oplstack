@@ -13,10 +13,11 @@ class Attribute:
 
 @dataclass
 class Edge:
+    id: str
     source: str
     target: str
     type: str
-    attributes: Dict[str, Attribute]
+    attributes: dict
 
 @dataclass
 class Node:
@@ -32,19 +33,22 @@ def read_from_db(db_path, json_file_path):
     data_to_export = {}
     for k, v in db.items():
         print(f"Raw output from RocksDB: {v}")
-        # print("Attempting to load JSON string")
-        node_dict = json.loads(v.decode('utf-8'))['node']  # no 'embed' in the dictionary anymore
-        node = Node(**node_dict)
-        data_to_export[k] = asdict(node)
-        # print(f'Node ID: {k}')
-        # print(f'Content: {node.content}')
-        # print(f'Attributes: {node.attributes}')
-        # print(f'Edges: {node.edges}\n')
+        item_dict = json.loads(v.decode('utf-8'))
+        # print(item_dict)
+        if 'node' in item_dict:
+            node = Node(**item_dict['node'])
+            data_to_export[k] = asdict(node)
+        elif 'edge' in item_dict:
+            edge = Edge(**item_dict['edge'])
+            # May need to handle the edge data export to JSON
+            # data_to_export[k] = asdict(edge)
 
     with open(json_file_path, 'w') as json_file:
         json.dump(data_to_export, json_file)
 
     db.close()
+
+
 
 # Example usage
 db_filepath = 'preprocessing_pipeline/test_dict'
