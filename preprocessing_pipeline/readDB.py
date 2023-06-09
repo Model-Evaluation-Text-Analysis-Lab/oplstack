@@ -49,7 +49,6 @@ def read_from_db(db_path, json_file_path):
     db.close()
 
 
-
 # Example usage
 db_filepath = 'preprocessing_pipeline/test_dict'
 json_file_path = 'preprocessing_pipeline/db_export.json'

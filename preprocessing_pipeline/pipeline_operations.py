@@ -67,16 +67,28 @@ def store_chunks_in_db(data, db_path, embeds_folder_path):
             db[prev_node_id] = json.dumps({'node': asdict(parent_node)}).encode('utf-8')
 
         prev_node_id = node_id
-        
-    db.close()
 
-def embed_chunks(db_path, embeds_folder_path):
+    db.close()
+    
+def embed_chunks(db_path, embeds_folder_path, max_file_size_kb=500):
     db = rocksdict.Rdict(db_path)
+    embeddings = []  # List to store embeddings
+    file_number = 0  # Start with file number 0
+    size_of_embedding = None
     for k, v in db.items():
         data_dict = json.loads(v.decode('utf-8'))
         if 'node' in data_dict:
             node = Node(**data_dict['node'])
             embedding = model.encode(node.content)
-            np.save(f"{embeds_folder_path}/{k}.npy", embedding) 
-            assert 'embedding' not in data_dict['node'].keys(), 'Embedding found in node dictionary.'
+            if size_of_embedding is None:
+                size_of_embedding = embedding.nbytes
+            embeddings.append((k, embedding.tolist()))  # Store tuple of node id and embedding
+            if len(embeddings) * size_of_embedding >= max_file_size_kb * 1024:  # Check the total size in bytes
+                np.save(f"{embeds_folder_path}/embeddings{file_number}.npy", np.array(embeddings, dtype=object))  # Save embeddings
+                embeddings = []  # Reset the embeddings list
+                file_number += 1  # Increment the file number
+    if embeddings:  # Save any remaining embeddings
+        np.save(f"{embeds_folder_path}/embeddings{file_number}.npy", np.array(embeddings, dtype=object))
+    db.close()
+
 
