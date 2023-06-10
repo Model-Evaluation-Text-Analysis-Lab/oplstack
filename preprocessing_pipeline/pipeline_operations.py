@@ -1,7 +1,6 @@
 import os
 import uuid
-import rocksdict
-import json
+import rocksdict, sys
 import numpy as np
 from pdfminer.high_level import extract_text
 from typing import Dict, List, Optional, Union
@@ -25,7 +24,7 @@ def create_node_and_edge(db, node_id, content, node_type, attributes, parent_id)
         edges=[],
         parent_id=parent_id  
     )
-    db[node_id] = json.dumps({'node': asdict(node)}).encode('utf-8')
+    db[node_id] = {'node': asdict(node)}
 
     # Create an edge from parent to the new node
     edge_id = str(uuid.uuid4())
@@ -36,15 +35,14 @@ def create_node_and_edge(db, node_id, content, node_type, attributes, parent_id)
         type='child',
         attributes={}
     )
-    db[edge_id] = json.dumps({'edge': asdict(edge)}).encode('utf-8')
+    db[edge_id] = {'edge': asdict(edge)}
 
     return node_id, edge_id
 
 def update_parent_node(db, parent_id, child_edge_id):
-    parent_dict = json.loads(db[parent_id].decode('utf-8'))
-    parent = Node(**parent_dict['node'])
+    parent = Node(**db[parent_id]['node'])
     parent.edges.append(child_edge_id)
-    db[parent_id] = json.dumps({'node': asdict(parent)}).encode('utf-8')
+    db[parent_id] = {'node': asdict(parent)}
 
 def store_chunks_in_db(data, db_path, document_filepath):
     db = rocksdict.Rdict(db_path)
@@ -81,24 +79,31 @@ def store_chunks_in_db(data, db_path, document_filepath):
 
     db.close()
 
-def embed_chunks(db_path, embeds_folder_path, max_file_size_kb=500):
-    os.makedirs(embeds_folder_path, exist_ok=True)
-    db = rocksdict.Rdict(db_path)
-    embeddings = []  # List to store embeddings
-    file_number = 0  # Start with file number 0
-    size_of_embedding = None
-    for k, v in db.items():
-        data_dict = json.loads(v.decode('utf-8'))
-        if 'node' in data_dict:
-            node = Node(**data_dict['node'])
+def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_kb: int = 500) -> None:
+    os.makedirs(embedding_folder_path, exist_ok=True)
+    database = rocksdict.Rdict(database_path)
+    embedding_list = []  # Initialize an empty list to store the embeddings
+    file_counter = 0  # Initialize a counter to keep track of the file number
+    embedding_size = None
+    
+    for key, value in database.items():
+        if 'node' in value:
+            node = Node(**value['node'])
             embedding = model.encode(node.content)
-            if size_of_embedding is None:
-                size_of_embedding = embedding.nbytes
-            embeddings.append((k, embedding.tolist()))  # Store tuple of node id and embedding
-            if len(embeddings) * size_of_embedding >= max_file_size_kb * 1024:  # Check the total size in bytes
-                np.save(f"{embeds_folder_path}/embeddings{file_number}.npy", np.array(embeddings, dtype=object))  # Save embeddings
-                embeddings = []  # Reset the embeddings list
-                file_number += 1  # Increment the file number
-    if embeddings:  # Save any remaining embeddings
-        np.save(f"{embeds_folder_path}/embeddings{file_number}.npy", np.array(embeddings, dtype=object))
-    db.close()
+            
+            if embedding_size is None:
+                embedding_size = sys.getsizeof(embedding)  # Calculate size of a single embedding in bytes
+                
+            embedding_list.append(embedding)
+            
+            # Check if the size of the embeddings list has exceeded the maximum file size
+            if (len(embedding_list) * embedding_size) / 1024 > max_file_size_kb:  # Convert bytes to kilobytes
+                np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
+                embedding_list = []  # Reset the list
+                file_counter += 1  # Increment the file counter
+                
+    # Store any remaining embeddings that didn't reach the maximum file size
+    if embedding_list:
+        np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
+        
+    database.close()

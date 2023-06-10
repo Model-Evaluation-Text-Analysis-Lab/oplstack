@@ -13,7 +13,7 @@ def read_from_db(db_path, json_file_path):
 
     for k, v in db.items():
         # print(f"Raw output from RocksDB: {v}")
-        item_dict = json.loads(v.decode('utf-8'))
+        item_dict = v  # assign dict directly from db value
         if 'node' in item_dict:
             # Transform edge IDs into Edge dictionaries temporarily, filtering out non-existing edges
             valid_edges = []
@@ -43,8 +43,3 @@ def read_from_db(db_path, json_file_path):
 db_filepath = 'preprocessing_pipeline/output_files/test_dict'
 json_file_path = 'preprocessing_pipeline/output_files/db_export.json'
 read_from_db(db_filepath, json_file_path)
-
-
-
-
-
