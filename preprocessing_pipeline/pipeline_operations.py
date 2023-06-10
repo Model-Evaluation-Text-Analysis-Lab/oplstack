@@ -2,9 +2,7 @@ import os
 import uuid
 import rocksdict, sys
 import numpy as np
-from pdfminer.high_level import extract_text
 from typing import Dict, List, Optional, Union
-from nltk.tokenize import sent_tokenize
 import sentence_transformers
 from datatypes import *
 from dataclasses import asdict
@@ -14,8 +12,10 @@ import json
 
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
 
+
 def generate_document_id(doc_name, doc_type):
     return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
+
 
 def create_node(db, node_id, content, node_type, attributes):
     node = Node(
@@ -23,55 +23,72 @@ def create_node(db, node_id, content, node_type, attributes):
         content=content,
         type=node_type,
         attributes=attributes,
+        edges=[],
     )
     db[node_id] = {'node': asdict(node)}
-    return node
+    return node_id
+
 
 def create_edge(db, source_id, target_id):
-    # Create an edge from source to target
     edge_id = source_id + "-parent-" + target_id + "-child"
     edge = Edge(
         id=edge_id,
         source=source_id,
         target=target_id,
         type='child',
+        attributes={}
     )
     db[edge_id] = {'edge': asdict(edge)}
-    return edge
+    return edge_id
+
+
+def update_node_with_edge(db, node_id, edge_id):
+    node = Node(**db[node_id]['node'])
+    node.edges.append(edge_id)
+    db[node_id] = {'node': asdict(node)}
+
 
 def store_chunks_in_db(data, db_path, document_filepath):
     db = rocksdict.Rdict(db_path)
 
+    # Check if root node exists, if not, create it
+    if 'root' not in db:
+        root_node_id = create_node(db, 'root', 'root', 'root', {})
+    else:
+        root_node_id = 'root'
+
     doc_name = os.path.basename(document_filepath)
     doc_type = os.path.splitext(doc_name)[1][1:]
 
-    doc_node_id = generate_document_id(doc_name, doc_type)
+    # Create or retrieve document type node under root node
+    doc_type_node_id = generate_document_id(doc_type, 'type')
+    if doc_type_node_id not in db:
+        doc_type_node_id = create_node(db, doc_type_node_id, doc_type, "type", {})
+        edge_id = create_edge(db, root_node_id, doc_type_node_id)
+        update_node_with_edge(db, root_node_id, edge_id)
 
-    # Create nodes and edges for each chunk of data
-    nodes = []
-    edges = []
-    prev_node = create_node(db, doc_node_id, doc_name, "document", {})
-    nodes.append(prev_node)
+    # Create document node under document type node
+    doc_node_id = generate_document_id(doc_name, doc_type)
+    doc_node_id = create_node(db, doc_node_id, doc_name, "document", {})
+    edge_id = create_edge(db, doc_type_node_id, doc_node_id)
+    update_node_with_edge(db, doc_type_node_id, edge_id)
+
+    prev_node_id = doc_node_id
+
+    # Add chunks under document node
     for i, chunk in enumerate(data, start=1):
         node_id = str(uuid.uuid4())
         attributes = chunk['attributes']
         attributes.update({'chunk_size': len(chunk['content'])})
-        node = create_node(db, node_id, chunk['content'], chunk['type'], attributes)
-        edge = create_edge(db, prev_node.id, node.id)
-        nodes.append(node)
-        edges.append(edge)
-        prev_node = node
 
-    # Create Document and store it under the root
-    doc = Document(id=doc_node_id, nodes=nodes, edges=edges)
-    
-    root_dict = db.get('root', asdict(Root(documents=[])))  # Get the root dictionary
-    root = Root(**root_dict)  # Convert dictionary to Root instance
-    
-    root.documents.append(doc)
-    db['root'] = asdict(root)
+        node_id = create_node(db, node_id, chunk['content'], chunk['type'], attributes)
+        edge_id = create_edge(db, prev_node_id, node_id)
+        
+        update_node_with_edge(db, prev_node_id, edge_id)
+        prev_node_id = node_id
 
     db.close()
+
 
 def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_kb: int = 500) -> None:
     os.makedirs(embedding_folder_path, exist_ok=True)
