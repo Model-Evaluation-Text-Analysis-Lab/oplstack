@@ -26,6 +26,7 @@ __pycache__/
 *.exe
 *.bundle
 db_export_v1.json
+search_results.json
 preprocessing_pipeline/output_files/
 
 
