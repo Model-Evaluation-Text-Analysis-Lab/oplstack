@@ -39,13 +39,11 @@ def get_all_edge_ids(database_path: str) -> List[str]:
 def prefix_search_edge_ids(edge_ids: List[str], prefix: str) -> List[str]:
     return [id for id in edge_ids if id.startswith(prefix)]
 
-
-# edge_ids = get_all_edge_ids('path_to_your_database')
-# prefix_edges = prefix_search_edge_ids(edge_ids, 'uid_parent')
-
-# print(prefix_edges)
-
 db_filepath = 'preprocessing_pipeline/output_files/test_dict'
-index_file_path = 'preprocessing_pipeline/output_files/vector_store/embed_index_0.idx.json'
+index_file_path = 'preprocessing_pipeline/output_files/vector_store/index_0.idx.json'
 test_decode_embed(index_file_path, db_filepath)
+
+edge_ids = get_all_edge_ids(db_filepath)
+prefix_edges = prefix_search_edge_ids(edge_ids, '72e817bf-7f6c-4c6a-af7c-4318b8af7c83-parent')
+print(prefix_edges)
 

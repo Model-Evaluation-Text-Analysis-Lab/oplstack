@@ -1,6 +1,6 @@
 from document_loader import split_text_into_chunks, load_document
 from pipeline_operations import store_chunks_in_db, embed_chunks
-import os
+from readDB import read_from_db
 
 document_filepaths = ['preprocessing_pipeline/documents/complex.pdf', 'preprocessing_pipeline/documents/sample.pdf'] 
 db_filepath = 'preprocessing_pipeline/output_files/test_dict'
@@ -19,3 +19,5 @@ def execute_pipeline(document_filepaths, db_filepath, embeds_folder_path, max_ch
 
 if __name__ == '__main__':
     execute_pipeline(document_filepaths, db_filepath, embeds_folder_path, max_chunk_size=100)
+    json_file_path = 'preprocessing_pipeline/output_files/db_export.json'
+    read_from_db(db_filepath, json_file_path)

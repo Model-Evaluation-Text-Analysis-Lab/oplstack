@@ -25,6 +25,9 @@ __pycache__/
 *.dll
 *.exe
 *.bundle
+db_export_v1.json
+preprocessing_pipeline/output_files/
+
 
 # Ignore common development environment and configuration files
 .idea/

@@ -29,7 +29,7 @@ def create_node(db, node_id, content, node_type, attributes):
 
 def create_edge(db, source_id, target_id):
     # Create an edge from source to target
-    edge_id = str(uuid.uuid4())
+    edge_id = source_id + "-parent-" + target_id + "-child"
     edge = Edge(
         id=edge_id,
         source=source_id,
