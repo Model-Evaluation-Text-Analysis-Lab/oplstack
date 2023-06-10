@@ -44,9 +44,11 @@ def load_document(file_path):
     file_extension = file_extension.lower()
 
     if file_extension == '.pdf':
-        return parse_pdf(file_path)
+        chunks = parse_pdf(file_path)
+        return ' '.join(chunk['content'] for chunk in chunks) # Extract 'content' field from each dictionary
     elif file_extension == '.html':
         pass
         #return load_html(file_path)
     else:
         raise NotImplementedError(f"Loading documents of type {file_extension} is not supported.")
+

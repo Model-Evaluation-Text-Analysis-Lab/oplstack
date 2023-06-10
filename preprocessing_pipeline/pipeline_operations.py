@@ -9,8 +9,12 @@ from nltk.tokenize import sent_tokenize
 import sentence_transformers
 from datatypes import *
 from dataclasses import asdict
+import hashlib
 
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
+
+def generate_document_id(doc_name, doc_type):
+    return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
 
 def split_text_into_chunks(text, max_chunk_size=100):
     sentences = sent_tokenize(text)
@@ -26,51 +30,73 @@ def split_text_into_chunks(text, max_chunk_size=100):
         chunks.append(current_chunk.strip())
     return chunks
 
-def store_chunks_in_db(data, db_path, embeds_folder_path):
-    os.makedirs(embeds_folder_path, exist_ok=True)
+def create_node_and_edge(db, node_id, content, node_type, attributes, parent_id):
+    node = Node(
+        id=node_id,
+        content=content,
+        type=node_type,
+        attributes=attributes,
+        edges=[],
+        parent_id=parent_id  
+    )
+    db[node_id] = json.dumps({'node': asdict(node)}).encode('utf-8')
+
+    # Create an edge from parent to the new node
+    edge_id = str(uuid.uuid4())
+    edge = Edge(
+        id=edge_id,
+        source=parent_id,
+        target=node_id,
+        type='child',
+        attributes={}
+    )
+    db[edge_id] = json.dumps({'edge': asdict(edge)}).encode('utf-8')
+
+    return node_id, edge_id
+
+def update_parent_node(db, parent_id, child_edge_id):
+    parent_dict = json.loads(db[parent_id].decode('utf-8'))
+    parent = Node(**parent_dict['node'])
+    parent.edges.append(child_edge_id)
+    db[parent_id] = json.dumps({'node': asdict(parent)}).encode('utf-8')
+
+def store_chunks_in_db(data, db_path, document_filepath):
     db = rocksdict.Rdict(db_path)
-    prev_node_id = None
+
+    root_id = 'root'  
+    if root_id not in db:
+        create_node_and_edge(db, root_id, "Root", "root", {}, None)
+
+    doc_name = os.path.basename(document_filepath)
+    doc_type = os.path.splitext(doc_name)[1][1:]
+    type_node_id = doc_type
+
+    # Check if the file type node already exists
+    if type_node_id not in db:
+        type_node_id, root_type_edge_id = create_node_and_edge(db, type_node_id, doc_type, "file_type", {}, root_id)
+        update_parent_node(db, root_id, root_type_edge_id)
+
+    doc_node_id = generate_document_id(doc_name, doc_type)
+    doc_node_id, type_doc_edge_id = create_node_and_edge(db, doc_node_id, doc_name, "document", {}, type_node_id)
+    update_parent_node(db, type_node_id, type_doc_edge_id)
+
+    prev_node_id = doc_node_id 
+
     for i, chunk in enumerate(data, start=1):
         node_id = str(uuid.uuid4())
-        attributes = chunk['attributes']  # TODO: Add additional attributes extraction logic here
-        edges = []  # Will contain edge IDs
-        node = Node(
-            id=node_id,
-            content=chunk['content'],
-            type=chunk['type'], 
-            attributes=attributes,
-            edges=edges,
-            parent_id=prev_node_id  # Connect to the previous node
-        )
-        
-        # Store the node
-        node_dict = {'node': asdict(node)}
-        db[node_id] = json.dumps(node_dict).encode('utf-8')
+        attributes = chunk['attributes']
+        attributes.update({'chunk_size': len(chunk['content'])})
 
-        # Create and store an edge if there is a previous node
+        node_id, child_edge_id = create_node_and_edge(db, node_id, chunk['content'], chunk['type'], attributes, prev_node_id)
         if prev_node_id is not None:
-            edge_id = str(uuid.uuid4())
-            edge = Edge(
-                id=edge_id,
-                source=prev_node_id,
-                target=node_id,
-                type='child',
-                attributes={}
-            )
-            edge_dict = {'edge': asdict(edge)}
-            db[edge_id] = json.dumps(edge_dict).encode('utf-8')
-
-            # Update the previous node with the new edge
-            parent_node_dict = json.loads(db[prev_node_id].decode('utf-8'))
-            parent_node = Node(**parent_node_dict['node'])
-            parent_node.edges.append(edge_id)
-            db[prev_node_id] = json.dumps({'node': asdict(parent_node)}).encode('utf-8')
+            update_parent_node(db, prev_node_id, child_edge_id)
 
         prev_node_id = node_id
 
     db.close()
-    
+
 def embed_chunks(db_path, embeds_folder_path, max_file_size_kb=500):
+    os.makedirs(embeds_folder_path, exist_ok=True)
     db = rocksdict.Rdict(db_path)
     embeddings = []  # List to store embeddings
     file_number = 0  # Start with file number 0
@@ -90,5 +116,3 @@ def embed_chunks(db_path, embeds_folder_path, max_file_size_kb=500):
     if embeddings:  # Save any remaining embeddings
         np.save(f"{embeds_folder_path}/embeddings{file_number}.npy", np.array(embeddings, dtype=object))
     db.close()
-
-
