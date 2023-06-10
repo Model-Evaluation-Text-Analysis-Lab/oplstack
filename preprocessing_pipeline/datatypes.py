@@ -13,7 +13,6 @@ class Edge:
     source: str
     target: str
     type: str
-    attributes: Dict[str, Attribute]
 
 @dataclass
 class Node:
@@ -21,5 +20,13 @@ class Node:
     content: str
     type: str
     attributes: Dict[str, Attribute]
-    edges: List[str]  # Instead of storing edges directly, store edge IDs
-    parent_id: Union[str, None] = None
+    
+@dataclass
+class Document:
+    id: str
+    nodes: List[Node]
+    edges: List[Edge]
+    
+@dataclass
+class Root:
+    documents: List[Document]
