@@ -1,5 +1,5 @@
-from pipeline_operations import split_text_into_chunks, store_chunks_in_db, embed_chunks
-from document_loader import load_document
+from document_loader import split_text_into_chunks, load_document
+from pipeline_operations import store_chunks_in_db, embed_chunks
 import os
 
 document_filepaths = ['preprocessing_pipeline/documents/complex.pdf', 'preprocessing_pipeline/documents/sample.pdf'] 

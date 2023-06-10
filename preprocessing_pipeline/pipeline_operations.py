@@ -16,20 +16,6 @@ model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
 def generate_document_id(doc_name, doc_type):
     return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
 
-def split_text_into_chunks(text, max_chunk_size=100):
-    sentences = sent_tokenize(text)
-    chunks = []
-    current_chunk = ''
-    for sentence in sentences:
-        if len(current_chunk) + len(sentence) <= max_chunk_size:
-            current_chunk += ' ' + sentence
-        else:
-            chunks.append(current_chunk.strip())
-            current_chunk = sentence
-    if current_chunk:
-        chunks.append(current_chunk.strip())
-    return chunks
-
 def create_node_and_edge(db, node_id, content, node_type, attributes, parent_id):
     node = Node(
         id=node_id,
