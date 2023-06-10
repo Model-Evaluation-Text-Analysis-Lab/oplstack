@@ -9,6 +9,8 @@ import sentence_transformers
 from datatypes import *
 from dataclasses import asdict
 import hashlib
+import json
+
 
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -83,9 +85,10 @@ def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_k
     os.makedirs(embedding_folder_path, exist_ok=True)
     database = rocksdict.Rdict(database_path)
     embedding_list = []  # Initialize an empty list to store the embeddings
+    index_list = []  # Initialize an empty list to store the node ID and index information
     file_counter = 0  # Initialize a counter to keep track of the file number
     embedding_size = None
-    
+
     for key, value in database.items():
         if 'node' in value:
             node = Node(**value['node'])
@@ -95,15 +98,21 @@ def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_k
                 embedding_size = sys.getsizeof(embedding)  # Calculate size of a single embedding in bytes
                 
             embedding_list.append(embedding)
+            index_list.append({'node_id': node.id, 'index': len(embedding_list) - 1})  # Store the node ID and the index
             
             # Check if the size of the embeddings list has exceeded the maximum file size
             if (len(embedding_list) * embedding_size) / 1024 > max_file_size_kb:  # Convert bytes to kilobytes
                 np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
+                with open(os.path.join(embedding_folder_path, f'pdf_document_name_{file_counter}.idx.json'), 'w') as json_file:
+                    json.dump(index_list, json_file)
                 embedding_list = []  # Reset the list
+                index_list = []  # Reset the list
                 file_counter += 1  # Increment the file counter
                 
-    # Store any remaining embeddings that didn't reach the maximum file size
+    # Store any remaining embeddings that didn't reachs the maximum file size
     if embedding_list:
         np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
+        with open(os.path.join(embedding_folder_path, f'embed_index_{file_counter}.idx.json'), 'w') as json_file:
+            json.dump(index_list, json_file)
         
     database.close()
