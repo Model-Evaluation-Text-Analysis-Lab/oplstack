@@ -1,3 +1,4 @@
+import glob
 import os
 import uuid
 import rocksdict, sys
@@ -89,13 +90,20 @@ def store_chunks_in_db(data, db_path, document_filepath):
 
     db.close()
 
-
 def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_kb: int = 500) -> None:
     os.makedirs(embedding_folder_path, exist_ok=True)
     database = rocksdict.Rdict(database_path)
     embedding_list = []  # Initialize an empty list to store the embeddings
-    index_list = []  # Initialize an empty list to store the node ID and index information
-    file_counter = 0  # Initialize a counter to keep track of the file number
+    index_list = []  # Initialize an empty list to store the indices
+
+    # Determine the start of the file counter
+    existing_files = glob.glob(os.path.join(embedding_folder_path, 'embeddings_*.npy'))
+    if existing_files:
+        file_counters = [int(os.path.splitext(os.path.basename(file))[0].split('_')[-1]) for file in existing_files]
+        file_counter = max(file_counters) + 1
+    else:
+        file_counter = 0
+
     embedding_size = None
 
     for key, value in database.items():
@@ -107,21 +115,26 @@ def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_k
                 embedding_size = sys.getsizeof(embedding)  # Calculate size of a single embedding in bytes
                 
             embedding_list.append(embedding)
-            index_list.append({'node_id': node.id, 'index': len(embedding_list) - 1})  # Store the node ID and the index
+            index_entry = {'node_id': node.id, 'index': len(embedding_list) - 1}  # Store the node ID and the index
             
             # Check if the size of the embeddings list has exceeded the maximum file size
             if (len(embedding_list) * embedding_size) / 1024 > max_file_size_kb:  # Convert bytes to kilobytes
                 np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
                 with open(os.path.join(embedding_folder_path, f'index_{file_counter}.idx.json'), 'w') as json_file:
-                    json.dump(index_list, json_file)
+                    json.dump(index_list, json_file)  # Save the entire index list for this file
                 embedding_list = []  # Reset the list
-                index_list = []  # Reset the list
+                index_list = []  # Reset the index list
                 file_counter += 1  # Increment the file counter
+            else:
+                index_list.append(index_entry)  # Only append to the index list if a new file isn't created
                 
     # Store any remaining embeddings that didn't reach the maximum file size
     if embedding_list:
         np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
         with open(os.path.join(embedding_folder_path, f'index_{file_counter}.idx.json'), 'w') as json_file:
-            json.dump(index_list, json_file)
-        
+            json.dump(index_list, json_file)  # Save the index list for the remaining embeddings
+    
+    # Debugging info
+    print(f"Number of embeddings saved: {file_counter}")
+    
     database.close()

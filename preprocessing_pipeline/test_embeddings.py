@@ -1,12 +1,13 @@
 import glob
+from typing import Optional
 import numpy as np
 import rocksdict, sys
-from datatypes import *
 import random
 import json
-from typing import Optional
 from sklearn.metrics.pairwise import cosine_similarity
 import sentence_transformers
+from datatypes import *
+
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
 
 def get_node_content(database_path: str, node_id: str):
@@ -29,24 +30,41 @@ def test_decode_embed(index_file_path: str, database_path: str, embed_id: Option
     print(node.content)
     database.close()
 
-def similarity_search(search_embed, embeds_file_path):
-    embeddings = np.load(embeds_file_path)
-    with open(index_file_path, 'r') as json_file:
-        index_list = json.load(json_file)
-    similarities = cosine_similarity([search_embed], embeddings)[0]
-    top_indices = similarities.argsort()[-3:][::-1]
-    top_node_ids = [index_list[i]['node_id'] for i in top_indices]
+def similarity_search(search_embed, embeds_file_paths, index_file_paths):
+    top_node_ids = []
+    max_similarity = -1  # Initial maximum similarity
+    for embeds_file_path, index_file_path in zip(embeds_file_paths, index_file_paths):
+        embeddings = np.load(embeds_file_path)
+        with open(index_file_path, 'r') as json_file:
+            index_list = json.load(json_file)
+        similarities = cosine_similarity([search_embed], embeddings)[0]
+
+        # Make sure there are as many index entries as embeddings
+        assert len(embeddings) == len(index_list), f"Embeddings and index list lengths do not match for file {embeds_file_path}"
+        
+        # Update maximum similarity if a higher value is found
+        max_similarity = max(max_similarity, max(similarities))
+        
+        top_indices = similarities.argsort()[-3:][::-1]
+        top_node_ids.extend([index_list[i]['node_id'] for i in top_indices])
+    
+    print(f"Maximum similarity: {max_similarity}")
     return top_node_ids
 
+
 db_filepath = 'preprocessing_pipeline/output_files/test_dict'
-index_file_path = 'preprocessing_pipeline/output_files/vector_store/index_0.idx.json'
-embeds_file_path = 'preprocessing_pipeline/output_files/vector_store/embeddings_0.npy'
+embeds_file_paths = sorted(glob.glob('preprocessing_pipeline/output_files/vector_store/embeddings_*.npy'))
+index_file_paths = sorted(glob.glob('preprocessing_pipeline/output_files/vector_store/index_*.idx.json'))
 
 search_term = "Everything about FJH"
 search_embed = model.encode(search_term)
 
-top_node_ids = similarity_search(search_embed, embeds_file_path)
+print(f"Number of embedding files: {len(embeds_file_paths)}")
+
+top_node_ids = similarity_search(search_embed, embeds_file_paths, index_file_paths)
+print(f"Number of retrieved nodes: {len(top_node_ids)}")
 search_results = [get_node_content(db_filepath, node_id) for node_id in top_node_ids]
+
 
 search_dict = {search_term: search_results}
 with open('preprocessing_pipeline/output_files/search_results.json', 'w') as json_file:
