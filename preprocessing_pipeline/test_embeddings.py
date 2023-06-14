@@ -66,7 +66,7 @@ db_filepath = 'preprocessing_pipeline/output_files/test_dict'
 embeds_file_paths = sorted(glob.glob('preprocessing_pipeline/output_files/vector_store/embeddings_*.npy'))
 index_file_paths = sorted(glob.glob('preprocessing_pipeline/output_files/vector_store/index_*.idx.json'))
 
-search_term = "FJH"
+search_term = "Mining"
 search_embed = model.encode(search_term)
 
 print(f"Number of embedding files: {len(embeds_file_paths)}")

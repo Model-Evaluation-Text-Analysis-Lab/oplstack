@@ -26,16 +26,16 @@ def store_chunks_in_graph(data, db_path, document_filepath):
     doc_type = os.path.splitext(doc_name)[1][1:]
 
     doc_type_vertex = graph_db.add_vertex(type=doc_type, content=doc_type)
-    graph_db.add_edge(root_vertex, doc_type_vertex, type1='type', type2='type')
+    graph_db.add_edge(root_vertex, doc_type_vertex, type1='child', type2='parent')
 
     doc_vertex = graph_db.add_vertex(type=doc_name, content=doc_name)
-    graph_db.add_edge(doc_type_vertex, doc_vertex, type1='document', type2='document')
+    graph_db.add_edge(doc_type_vertex, doc_vertex, type1='child', type2='parent')
 
     prev_vertex = doc_vertex
 
     for i, chunk in enumerate(data, start=1):
         chunk_vertex = graph_db.add_vertex(type=chunk['type'], content=chunk['content'])
-        graph_db.add_edge(prev_vertex, chunk_vertex, type1='chunk', type2='chunk')
+        graph_db.add_edge(prev_vertex, chunk_vertex, type1='child', type2='parent')
         prev_vertex = chunk_vertex
 
     graph_db.close_db()
