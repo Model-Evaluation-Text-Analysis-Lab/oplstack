@@ -39,6 +39,7 @@ preprocessing_pipeline/output_files/
 *.sublime-workspace
 
 credentials.yml
+requirements.txt
 
 preprocessing_pipeline/graph
 

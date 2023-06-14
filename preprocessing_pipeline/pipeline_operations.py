@@ -15,12 +15,7 @@ model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
 def generate_document_id(doc_name, doc_type):
     return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
 
-def store_chunks_in_graph(data, db_path, document_filepath):
-    graph_db = GraphDB(db_path)
-
-    root_vertex = graph_db.get_vertex('root')
-    if root_vertex is None:
-        root_vertex = graph_db.add_vertex(type='root', content='root')
+def store_chunks_in_graph(data, graph_db, document_filepath, root_vertex):
 
     doc_name = os.path.basename(document_filepath)
     doc_type = os.path.splitext(doc_name)[1][1:]
@@ -37,8 +32,6 @@ def store_chunks_in_graph(data, db_path, document_filepath):
         chunk_vertex = graph_db.add_vertex(type=chunk['type'], content=chunk['content'])
         graph_db.add_edge(prev_vertex, chunk_vertex, type1='child', type2='parent')
         prev_vertex = chunk_vertex
-
-    graph_db.close_db()
 
 
 # ----- EMBEDDINGS GENERATION -----
@@ -61,9 +54,9 @@ def check_and_save_embeddings(embedding_list, index_list, embedding_size, max_fi
         return [], [], file_counter + 1
     return embedding_list, index_list, file_counter
 
-def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_kb: int = 500) -> None:
+def embed_chunks(graph_db: GraphDB, embedding_folder_path: str, max_file_size_kb: int = 500) -> None:
     os.makedirs(embedding_folder_path, exist_ok=True)
-    graph_db = GraphDB(database_path)
+    # graph_db = GraphDB(database_path)
     embedding_list = []  # Initialize an empty list to store the embeddings
     index_list = []  # Initialize an empty list to store the indices
 
@@ -100,4 +93,4 @@ def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_k
 
     print(f"Number of embeddings saved: {file_counter}")
 
-    graph_db.close_db()
+    # graph_db.close_db()
