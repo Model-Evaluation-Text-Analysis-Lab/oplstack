@@ -1,37 +1,46 @@
-import glob
-import os
 from graph.graph import Vertex, Edge, GraphDB
-import sys
-import numpy as np
-import sentence_transformers
+import os
 import hashlib
+import sentence_transformers
+import numpy as np
+import sys
+import glob
+import re
 import json
-import re 
 
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
-
-# ----- CHUNKS GENERATION AND STORAGE IN ROCKSDB -----
 
 def generate_document_id(doc_name, doc_type):
     return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
 
-def store_chunks_in_graph(data, graph_db, document_filepath, root_vertex):
-
+def store_chunks_in_graph(data, graph_db, document_filepath, root_vertex, vertex_cache):
     doc_name = os.path.basename(document_filepath)
     doc_type = os.path.splitext(doc_name)[1][1:]
 
-    doc_type_vertex = graph_db.add_vertex(type=doc_type, content=doc_type)
-    graph_db.add_edge(root_vertex, doc_type_vertex, type1='child', type2='parent')
+    documents_vertex = get_or_create_vertex(graph_db, 'Documents', 'Documents', vertex_cache)
+    graph_db.add_edge(root_vertex, documents_vertex, type1='child', type2='parent')
 
-    doc_vertex = graph_db.add_vertex(type=doc_name, content=doc_name)
+    doc_type_vertex = get_or_create_vertex(graph_db, doc_type, doc_type, vertex_cache)
+    graph_db.add_edge(documents_vertex, doc_type_vertex, type1='child', type2='parent')
+
+    doc_vertex = get_or_create_vertex(graph_db, doc_name, doc_name, vertex_cache)
     graph_db.add_edge(doc_type_vertex, doc_vertex, type1='child', type2='parent')
 
     prev_vertex = doc_vertex
 
     for i, chunk in enumerate(data, start=1):
-        chunk_vertex = graph_db.add_vertex(type=chunk['type'], content=chunk['content'])
+        chunk_vertex = get_or_create_vertex(graph_db, chunk['type'], chunk['content'], vertex_cache)
         graph_db.add_edge(prev_vertex, chunk_vertex, type1='child', type2='parent')
         prev_vertex = chunk_vertex
+
+
+def get_or_create_vertex(graph_db, type, content, vertex_cache):
+    if (type, content) in vertex_cache:
+        vertex = graph_db.get_vertex(vertex_cache[(type, content)])
+    else:
+        vertex = graph_db.add_vertex(type=type, content=content)
+        vertex_cache[(type, content)] = vertex.id
+    return vertex
 
 
 # ----- EMBEDDINGS GENERATION -----
