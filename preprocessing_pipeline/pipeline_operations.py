@@ -10,25 +10,22 @@ from dataclasses import asdict
 import hashlib
 import json
 
-
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
-
 
 def generate_document_id(doc_name, doc_type):
     return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
 
-
-def create_node(db, node_id, content, node_type, attributes):
+def create_node(db, node_id, content, node_type, attributes, parent_id=None):
     node = Node(
         id=node_id,
         content=content,
         type=node_type,
         attributes=attributes,
         edges=[],
+        parent_id=parent_id,
     )
     db[node_id] = {'node': asdict(node)}
     return node_id
-
 
 def create_edge(db, source_id, target_id):
     edge_id = source_id + "-parent-" + target_id + "-child"
@@ -42,12 +39,10 @@ def create_edge(db, source_id, target_id):
     db[edge_id] = {'edge': asdict(edge)}
     return edge_id
 
-
 def update_node_with_edge(db, node_id, edge_id):
     node = Node(**db[node_id]['node'])
     node.edges.append(edge_id)
     db[node_id] = {'node': asdict(node)}
-
 
 def store_chunks_in_db(data, db_path, document_filepath):
     db = rocksdict.Rdict(db_path)
@@ -64,13 +59,13 @@ def store_chunks_in_db(data, db_path, document_filepath):
     # Create or retrieve document type node under root node
     doc_type_node_id = generate_document_id(doc_type, 'type')
     if doc_type_node_id not in db:
-        doc_type_node_id = create_node(db, doc_type_node_id, doc_type, "type", {})
+        doc_type_node_id = create_node(db, doc_type_node_id, doc_type, "type", {}, parent_id=root_node_id)
         edge_id = create_edge(db, root_node_id, doc_type_node_id)
         update_node_with_edge(db, root_node_id, edge_id)
 
     # Create document node under document type node
     doc_node_id = generate_document_id(doc_name, doc_type)
-    doc_node_id = create_node(db, doc_node_id, doc_name, "document", {})
+    doc_node_id = create_node(db, doc_node_id, doc_name, "document", {}, parent_id=doc_type_node_id)
     edge_id = create_edge(db, doc_type_node_id, doc_node_id)
     update_node_with_edge(db, doc_type_node_id, edge_id)
 
@@ -82,7 +77,7 @@ def store_chunks_in_db(data, db_path, document_filepath):
         attributes = chunk['attributes']
         attributes.update({'chunk_size': len(chunk['content'])})
 
-        node_id = create_node(db, node_id, chunk['content'], chunk['type'], attributes)
+        node_id = create_node(db, node_id, chunk['content'], chunk['type'], attributes, parent_id=prev_node_id)
         edge_id = create_edge(db, prev_node_id, node_id)
         
         update_node_with_edge(db, prev_node_id, edge_id)

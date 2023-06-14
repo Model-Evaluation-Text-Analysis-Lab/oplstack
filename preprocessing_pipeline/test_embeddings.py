@@ -1,7 +1,8 @@
 import glob
 from typing import Optional
 import numpy as np
-import rocksdict, sys
+import rocksdict
+import sys
 import random
 import json
 from sklearn.metrics.pairwise import cosine_similarity
@@ -41,13 +42,13 @@ def similarity_search(search_embed, embeds_file_paths, index_file_paths):
 
         # Make sure there are as many index entries as embeddings
         assert len(embeddings) == len(index_list), f"Embeddings and index list lengths do not match for file {embeds_file_path}"
-        
+
         # Update maximum similarity if a higher value is found
         max_similarity = max(max_similarity, max(similarities))
-        
+
         top_indices = similarities.argsort()[-3:][::-1]
         top_node_ids.extend([index_list[i]['node_id'] for i in top_indices])
-    
+
     print(f"Maximum similarity: {max_similarity}")
     return top_node_ids
 
@@ -56,16 +57,27 @@ db_filepath = 'preprocessing_pipeline/output_files/test_dict'
 embeds_file_paths = sorted(glob.glob('preprocessing_pipeline/output_files/vector_store/embeddings_*.npy'))
 index_file_paths = sorted(glob.glob('preprocessing_pipeline/output_files/vector_store/index_*.idx.json'))
 
-search_term = "Everything about FJH"
+search_term = "urban mining"
 search_embed = model.encode(search_term)
 
 print(f"Number of embedding files: {len(embeds_file_paths)}")
 
 top_node_ids = similarity_search(search_embed, embeds_file_paths, index_file_paths)
 print(f"Number of retrieved nodes: {len(top_node_ids)}")
-search_results = [get_node_content(db_filepath, node_id) for node_id in top_node_ids]
 
+try:
+    with open('preprocessing_pipeline/output_files/search_results.json', 'r') as json_file:
+        search_dict = json.load(json_file)
+except FileNotFoundError:
+    search_dict = {}
 
-search_dict = {search_term: search_results}
+# Retrieve previous search results for the current search term
+previous_results = search_dict.get(search_term, [])
+# Append the new search results
+search_results = previous_results + [get_node_content(db_filepath, node_id) for node_id in top_node_ids]
+# Update the search dictionary
+search_dict[search_term] = search_results
+
+# Save the updated search results
 with open('preprocessing_pipeline/output_files/search_results.json', 'w') as json_file:
     json.dump(search_dict, json_file)

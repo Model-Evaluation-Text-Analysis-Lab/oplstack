@@ -40,6 +40,8 @@ preprocessing_pipeline/output_files/
 
 credentials.yml
 
+preprocessing_pipeline/graph
+
 # Ignore common package and dependency directories
 node_modules/
 bower_components/
