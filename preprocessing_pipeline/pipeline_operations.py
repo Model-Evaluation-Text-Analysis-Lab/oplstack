@@ -1,135 +1,103 @@
 import glob
 import os
-import uuid
-import rocksdict, sys
+from graph.graph import Vertex, Edge, GraphDB
+import sys
 import numpy as np
-from typing import Dict, List, Optional, Union
 import sentence_transformers
-from datatypes import *
-from dataclasses import asdict
 import hashlib
 import json
+import re 
 
 model = sentence_transformers.SentenceTransformer('all-MiniLM-L6-v2')
+
+# ----- CHUNKS GENERATION AND STORAGE IN ROCKSDB -----
 
 def generate_document_id(doc_name, doc_type):
     return hashlib.sha1((doc_name + doc_type).encode()).hexdigest()
 
-def create_node(db, node_id, content, node_type, attributes, parent_id=None):
-    node = Node(
-        id=node_id,
-        content=content,
-        type=node_type,
-        attributes=attributes,
-        edges=[],
-        parent_id=parent_id,
-    )
-    db[node_id] = {'node': asdict(node)}
-    return node_id
+def store_chunks_in_graph(data, db_path, document_filepath):
+    graph_db = GraphDB(db_path)
 
-def create_edge(db, source_id, target_id):
-    edge_id = source_id + "-parent-" + target_id + "-child"
-    edge = Edge(
-        id=edge_id,
-        source=source_id,
-        target=target_id,
-        type='child',
-        attributes={}
-    )
-    db[edge_id] = {'edge': asdict(edge)}
-    return edge_id
-
-def update_node_with_edge(db, node_id, edge_id):
-    node = Node(**db[node_id]['node'])
-    node.edges.append(edge_id)
-    db[node_id] = {'node': asdict(node)}
-
-def store_chunks_in_db(data, db_path, document_filepath):
-    db = rocksdict.Rdict(db_path)
-
-    # Check if root node exists, if not, create it
-    if 'root' not in db:
-        root_node_id = create_node(db, 'root', 'root', 'root', {})
-    else:
-        root_node_id = 'root'
+    root_vertex = graph_db.get_vertex('root')
+    if root_vertex is None:
+        root_vertex = graph_db.add_vertex(type='root', content='root')
 
     doc_name = os.path.basename(document_filepath)
     doc_type = os.path.splitext(doc_name)[1][1:]
 
-    # Create or retrieve document type node under root node
-    doc_type_node_id = generate_document_id(doc_type, 'type')
-    if doc_type_node_id not in db:
-        doc_type_node_id = create_node(db, doc_type_node_id, doc_type, "type", {}, parent_id=root_node_id)
-        edge_id = create_edge(db, root_node_id, doc_type_node_id)
-        update_node_with_edge(db, root_node_id, edge_id)
+    doc_type_vertex = graph_db.add_vertex(type=doc_type, content=doc_type)
+    graph_db.add_edge(root_vertex, doc_type_vertex, type1='type', type2='type')
 
-    # Create document node under document type node
-    doc_node_id = generate_document_id(doc_name, doc_type)
-    doc_node_id = create_node(db, doc_node_id, doc_name, "document", {}, parent_id=doc_type_node_id)
-    edge_id = create_edge(db, doc_type_node_id, doc_node_id)
-    update_node_with_edge(db, doc_type_node_id, edge_id)
+    doc_vertex = graph_db.add_vertex(type=doc_name, content=doc_name)
+    graph_db.add_edge(doc_type_vertex, doc_vertex, type1='document', type2='document')
 
-    prev_node_id = doc_node_id
+    prev_vertex = doc_vertex
 
-    # Add chunks under document node
     for i, chunk in enumerate(data, start=1):
-        node_id = str(uuid.uuid4())
-        attributes = chunk['attributes']
-        attributes.update({'chunk_size': len(chunk['content'])})
+        chunk_vertex = graph_db.add_vertex(type=chunk['type'], content=chunk['content'])
+        graph_db.add_edge(prev_vertex, chunk_vertex, type1='chunk', type2='chunk')
+        prev_vertex = chunk_vertex
 
-        node_id = create_node(db, node_id, chunk['content'], chunk['type'], attributes, parent_id=prev_node_id)
-        edge_id = create_edge(db, prev_node_id, node_id)
-        
-        update_node_with_edge(db, prev_node_id, edge_id)
-        prev_node_id = node_id
+    graph_db.close_db()
 
-    db.close()
+
+# ----- EMBEDDINGS GENERATION -----
+
+def create_embeddings(embedding_list, file_counter, embedding_folder_path):
+    np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
+
+def save_indices(index_list, file_counter, embedding_folder_path):
+    if len(index_list) == 0:
+        print("Warning: Attempted to save an empty index list.")
+    else:
+        index_file_path = os.path.join(embedding_folder_path, f'index_{file_counter}.idx.json')
+        with open(index_file_path, 'w') as json_file:
+            json.dump(index_list, json_file)
+
+def check_and_save_embeddings(embedding_list, index_list, embedding_size, max_file_size_kb, file_counter, embedding_folder_path):
+    if (len(embedding_list) * embedding_size) / 1024 > max_file_size_kb:
+        create_embeddings(embedding_list, file_counter, embedding_folder_path)
+        save_indices(index_list, file_counter, embedding_folder_path)
+        return [], [], file_counter + 1
+    return embedding_list, index_list, file_counter
 
 def embed_chunks(database_path: str, embedding_folder_path: str, max_file_size_kb: int = 500) -> None:
     os.makedirs(embedding_folder_path, exist_ok=True)
-    database = rocksdict.Rdict(database_path)
+    graph_db = GraphDB(database_path)
     embedding_list = []  # Initialize an empty list to store the embeddings
     index_list = []  # Initialize an empty list to store the indices
 
-    # Determine the start of the file counter
-    existing_files = glob.glob(os.path.join(embedding_folder_path, 'embeddings_*.npy'))
+    existing_files = glob.glob(os.path.join(embedding_folder_path, 'index_*.idx.json'))
     if existing_files:
-        file_counters = [int(os.path.splitext(os.path.basename(file))[0].split('_')[-1]) for file in existing_files]
+        # Extract numbers from filenames using regular expressions
+        file_counters = [int(re.findall(r'\d+', os.path.basename(file))[0]) for file in existing_files]
         file_counter = max(file_counters) + 1
+
+        # Load the latest processed vertices
+        with open(max(existing_files, key=os.path.getctime), 'r') as f:
+            processed_vertices = {entry['vertex_id'] for entry in json.load(f)}
     else:
         file_counter = 0
+        processed_vertices = set()
 
     embedding_size = None
 
-    for key, value in database.items():
-        if 'node' in value:
-            node = Node(**value['node'])
-            embedding = model.encode(node.content)
+    for key, content in graph_db.db.items():
+        if key.startswith(Vertex.prefix) and key not in processed_vertices:
+            embedding = model.encode(content)
             
             if embedding_size is None:
                 embedding_size = sys.getsizeof(embedding)  # Calculate size of a single embedding in bytes
                 
             embedding_list.append(embedding)
-            index_entry = {'node_id': node.id, 'index': len(embedding_list) - 1}  # Store the node ID and the index
-            
-            # Check if the size of the embeddings list has exceeded the maximum file size
-            if (len(embedding_list) * embedding_size) / 1024 > max_file_size_kb:  # Convert bytes to kilobytes
-                np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
-                with open(os.path.join(embedding_folder_path, f'index_{file_counter}.idx.json'), 'w') as json_file:
-                    json.dump(index_list, json_file)  # Save the entire index list for this file
-                embedding_list = []  # Reset the list
-                index_list = []  # Reset the index list
-                file_counter += 1  # Increment the file counter
-            else:
-                index_list.append(index_entry)  # Only append to the index list if a new file isn't created
-                
-    # Store any remaining embeddings that didn't reach the maximum file size
+            index_entry = {'vertex_id': key, 'index': len(embedding_list) - 1}
+            index_list.append(index_entry)  # Add index_entry to index_list before checking and saving embeddings
+            embedding_list, index_list, file_counter = check_and_save_embeddings(embedding_list, index_list, embedding_size, max_file_size_kb, file_counter, embedding_folder_path)
+
     if embedding_list:
-        np.save(os.path.join(embedding_folder_path, f'embeddings_{file_counter}.npy'), np.array(embedding_list))
-        with open(os.path.join(embedding_folder_path, f'index_{file_counter}.idx.json'), 'w') as json_file:
-            json.dump(index_list, json_file)  # Save the index list for the remaining embeddings
-    
-    # Debugging info
+        create_embeddings(embedding_list, file_counter, embedding_folder_path)
+        save_indices(index_list, file_counter, embedding_folder_path)
+
     print(f"Number of embeddings saved: {file_counter}")
-    
-    database.close()
+
+    graph_db.close_db()
