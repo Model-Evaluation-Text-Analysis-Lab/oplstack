@@ -7,7 +7,7 @@ def parse_vertex(vertex: Vertex):
         try:
             attributes = json.loads(vertex.content)
         except json.JSONDecodeError:
-            print(f"Failed to parse content for vertex {vertex.id}. Content: {vertex.content}")
+            # print(f"Failed to parse content for vertex {vertex.id}. Content: {vertex.content}")
             attributes = {}
     else:
         attributes = {}
@@ -55,10 +55,12 @@ def readDB(graph_db: GraphDB):
             src_vertex['edges'].append(edge)
 
         # Set parent_id of the destination vertex
-        if dst_vertex and dst_vertex['parent_id'] is None and src_vertex:
+        # Exclude the root vertex from having a parent_id
+        if dst_vertex and dst_vertex['parent_id'] is None and src_vertex and dst_vertex['type'] != 'root':
             dst_vertex['parent_id'] = src_vertex['id']
 
     return output
+
 
 def write_to_file(output, json_file_path):
     with open(json_file_path, 'w') as f:
