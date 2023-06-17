@@ -65,4 +65,3 @@ def load_document(file_path):
         #return load_html(file_path)
     else:
         raise NotImplementedError(f"Loading documents of type {file_extension} is not supported.")
-

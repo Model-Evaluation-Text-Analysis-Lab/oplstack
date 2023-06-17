@@ -33,7 +33,6 @@ def store_chunks_in_graph(data, graph_db, document_filepath, root_vertex, vertex
         graph_db.add_edge(prev_vertex, chunk_vertex, type1='child', type2='parent')
         prev_vertex = chunk_vertex
 
-
 def get_or_create_vertex(graph_db, type, content, vertex_cache):
     if (type, content) in vertex_cache:
         vertex = graph_db.get_vertex(vertex_cache[(type, content)])
