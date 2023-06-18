@@ -16,17 +16,51 @@ def extract_text_from_pdf_page(layout, image):
     layout = model.detect(image)
     ocr_agent = lp.ocr.TesseractAgent(languages="eng")
 
+    # Sort the layout blocks by their position in the document
+    layout.sort(key=lambda block: (block.coordinates[0], block.coordinates[1]))
+    print("Sorted layout blocks by their position in the document")
+
     # Extract the text from the layout
     data = []
+    stack = []
+    uid = 1
     for block in layout:
+        print(f"Processing block with uid {uid} and type {block.type}")
+        print(f"Block coordinates: {block.coordinates}")
         # Extract the text from the block
         segment_image = block.pad(left=5, right=5, top=5, bottom=5).crop_image(image)
         text = ocr_agent.detect(segment_image)
 
-        # Append the text to the data list
-        data.append({"type": block.type, "content": text})
+        # Check if the block is a title block
+        if block.type == "Title":
+            print(f"Identified a title block with uid block_{uid} and content: {text}")
+            # Pop all the text blocks off the stack and add them as children to the title block
+            children = []
+            while stack and stack[-1]["type"] != "Title":
+                children.append(stack.pop())
+            # Add the previous title block to the data
+            if stack:
+                data.append(stack.pop())
+            # Create a new title block and push it onto the stack
+            stack.append({"uid": f"block_{uid}", "type": block.type, "content": text, "children": children})
+        else:
+            # Push the text block onto the stack
+            stack.append({"uid": f"block_{uid}", "type": block.type, "content": text})
+
+        uid += 1
+
+    # Add the remaining blocks in the stack to the data
+    while stack:
+        children = []
+        while stack and stack[-1]["type"] != "Title":
+            children.append(stack.pop())
+        if stack:
+            title_block = stack.pop()
+            title_block["children"].extend(children)
+            data.append(title_block)
 
     return data
+
 
 
 def extract_text_from_pdf(file_path):
@@ -45,7 +79,7 @@ def save_data_as_json(data, file_path):
 
 # Specify the path to your file
 input_file_path = "preprocessing_pipeline/documents/sample.pdf"
-output_file_path = "preprocessing_pipeline/documents/sample.json"
+output_file_path = "preprocessing_pipeline/documents/sample_test_7.json"
 
 data = extract_text_from_pdf(input_file_path)
 save_data_as_json(data, output_file_path)

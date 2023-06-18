@@ -1,0 +1,45 @@
+[
+    {
+        "uid": "block_1",
+        "type": "Text",
+        "content": "\u2018This is a small demonstration pat file\n"
+    },
+    {
+        "uid": "block_2",
+        "type": "Text",
+        "content": "\u2018And more text. And more text. And more text. And more text. And more\ntext. And more text. And more text. Even more. Continued on page 2\n"
+    },
+    {
+        "uid": "block_3",
+        "type": "Text",
+        "content": "just for use in the Virtual Mechanics tutorials. More text. And more\ntext. And more text. And more text. And more text\n"
+    },
+    {
+        "uid": "block_4",
+        "type": "Text",
+        "content": "\u2018And more text. And more text. And more text. And more text. And more\ntxt And more text. Boring, 22222. And more tex. And move text. And\nmore text. And mare text. And more text. And more text. And more text.\n\u2018And more text. And more text.\n\n"
+    },
+    {
+        "uid": "block_5",
+        "type": "Title",
+        "content": "A Simple PDF File\n",
+        "children": []
+    },
+    {
+        "uid": "block_1",
+        "type": "Text",
+        "content": "continued from page 1. Yet more text. And more text. And more text.\n\u2018And more text. And more text. And more tex. And mare tex. And mare\ntext. Oh, how boring typing this stuf But not as boring as watching\npaint dey. And more text. And more text. And more text. And more te\nBoring. More, alte more text. The end, and ust as wal,\n\n"
+    },
+    {
+        "uid": "block_2",
+        "type": "Title",
+        "content": "Simple PDF File 2\n",
+        "children": [
+            {
+                "uid": "block_3",
+                "type": "Text",
+                "content": "continued from page 1. Yet more text. And more text. And more text.\n\u2018And more text, And more text. And more text. And more text. And mare\nAnd more text. And more text. And more text. And more text. And tm\n\n"
+            }
+        ]
+    }
+]
