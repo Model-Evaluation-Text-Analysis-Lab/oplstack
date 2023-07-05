@@ -4,6 +4,8 @@ from pdf2image import convert_from_path
 from PIL import ImageDraw
 from IPython.display import display
 import json
+import os
+
 
 #%%
 def extract_words_from_pdf(pdf_path):
@@ -43,9 +45,12 @@ def generate_and_display_image(pdf_path, words, page_width, page_height):
 
     # Display the image
     display(im)
+    # Save the image to a file
+    output_image_path = "preprocessing_pipeline/output_files/PDF/pdfplumber_output.jpg"
+    im.save(output_image_path, format="JPEG")
 
 #%%
-pdf_path = "preprocessing_pipeline/documents/sample.pdf"
+pdf_path = "preprocessing_pipeline/documents/complex.pdf"
 
 #%%
 words, page_width, page_height = extract_words_from_pdf(pdf_path)
@@ -58,7 +63,9 @@ generate_and_display_image(pdf_path, words, page_width, page_height)
 words_json = json.dumps(words)
 
 # Write the JSON string to a file
-with open('preprocessing_pipeline/documents/pdfplumber_output.json', 'w') as f:
+output_directory = "preprocessing_pipeline/output_files/PDF"
+os.makedirs(output_directory, exist_ok=True)
+with open('preprocessing_pipeline/output_files/PDF/pdfplumber_output.json', 'w') as f:
     f.write(words_json)
 
 # %%

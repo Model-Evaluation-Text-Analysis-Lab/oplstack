@@ -1,5 +1,8 @@
+#%%
 import json
+import uuid
 
+#%%
 # Function to compute Intersection over Union
 def bb_intersection_over_union(boxA, boxB):
     xA = max(boxA[0], boxB[0])
@@ -15,16 +18,19 @@ def bb_intersection_over_union(boxA, boxB):
     iou = interArea / float(boxAArea + boxBArea - interArea)
     return iou
 
+#%%
 # Load the output of the LayoutParser
-with open('preprocessing_pipeline/documents/lp_output_words.json', 'r') as f:
+with open('preprocessing_pipeline/output_files/PDF/lp_output_words.json', 'r') as f:
     lp_words_data = json.load(f)
 
 # Load the output of pdfplumber
-with open('preprocessing_pipeline/documents/pdfplumber_output.json', 'r') as f:
+with open('preprocessing_pipeline/output_files/PDF/pdfplumber_output.json', 'r') as f:
     pdfplumber_data = json.load(f)
 
-iou_tolerance = 0.5  # define your tolerance here
-
+#%%
+iou_tolerance = 0.1  # define your tolerance here
+pdfplumber_data_matched = set()
+lp_words_data_extended = lp_words_data[:]
 # Iterate over the layout words data
 for word_box in lp_words_data:
     # Initialize a content list for each box
@@ -32,19 +38,34 @@ for word_box in lp_words_data:
     # Get the coordinates of the current layout word box
     layout_word_coords = word_box['coordinates']
     # Iterate over the pdfplumber data
-    for word in pdfplumber_data:
-        # Get the coordinates of the current pdfplumber word
+    for idx, word in enumerate(pdfplumber_data):
         pdfplumber_word_coords = [word['x0'], word['top'], word['x1'], word['bottom']]
-        # Calculate the IOU
         iou = bb_intersection_over_union(layout_word_coords, pdfplumber_word_coords)
-        # If the IOU is greater than the defined tolerance, consider the words as matching
+
         if iou >= iou_tolerance:
             word_box['pdfplumber_content'].append(word['text'])
+            pdfplumber_data_matched.add(idx)
 
-    # Join the words to form sentences
     word_box['pdfplumber_content'] = ' '.join(word_box['pdfplumber_content'])
+    
+# Append unmatched pdfplumber data as text with new uuid
+for idx, word in enumerate(pdfplumber_data):
+    if idx not in pdfplumber_data_matched:
+        print(word['text'])
+        new_uuid = str(uuid.uuid4())
+        new_word_box = {
+            'uuid': new_uuid,
+            'type': 'text',
+            'content': "",
+            'coordinates': [word['x0'], word['top'], word['x1'], word['bottom']],
+            'pdfplumber_content': word['text']
+        }
+        lp_words_data_extended.append(new_word_box)
 
+
+#%%
 # Save the merged data
-with open('preprocessing_pipeline/documents/merged_output.json', 'w') as f:
-    json.dump(lp_words_data, f, indent=4)
-
+with open('preprocessing_pipeline/output_files/PDF/merged_output.json', 'w') as f:
+    json.dump(lp_words_data_extended, f, indent=4)
+    
+# %%

@@ -7,6 +7,7 @@ from IPython.display import display
 import cv2
 import uuid
 import pandas as pd
+import os
 
 #%%
 def init_models():
@@ -59,7 +60,7 @@ def process_page(layout_model, ocr_agent, image, confidence_threshold=0):
 
         page_data.extend(word_data)
 
-    return page_data, word_data, layout
+    return page_data, word_data, layout, layout_data
 
 #%%
 def visualize_layout(image, layout, word_data):
@@ -91,16 +92,18 @@ def visualize_layout(image, layout, word_data):
 
 #%%
 # Specify the path to your file
-input_file_path = "preprocessing_pipeline/documents/sample.pdf"
-words_output_path = "preprocessing_pipeline/documents/lp_output_words.json"
-layout_output_path = "preprocessing_pipeline/documents/lp_output_layout.json"
+input_file_path = "preprocessing_pipeline/documents/complex.pdf"
+words_output_path = "preprocessing_pipeline/output_files/PDF/lp_output_words.json"
+layout_output_path = "preprocessing_pipeline/output_files/PDF/lp_output_layout.json"
+output_directory = "preprocessing_pipeline/output_files/PDF"
+os.makedirs(output_directory, exist_ok=True)
 
 #%%
 layout_model, ocr_agent = init_models()
 pdf_layout, images = extract_pages_and_images(input_file_path)
 
 # Process only the first page
-data, word_data, layout = process_page(layout_model, ocr_agent, np.array(images[0]))
+data, word_data, layout, layout_data = process_page(layout_model, ocr_agent, np.array(images[0]))
 
 #%%
 # Visualize the layout
@@ -110,6 +113,10 @@ rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
 
 # Display the image
 display(Image.fromarray(rgb_image))
+pil_image = Image.fromarray(rgb_image)
+# Save the image as PDF
+output_pdf_path = "preprocessing_pipeline/output_files/PDF/lp_output.jpg"
+pil_image.save(output_pdf_path, format='JPEG')
 
 #%%
 # Save the data as a JSON file
