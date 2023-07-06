@@ -88,21 +88,22 @@ for word in pdfplumber_data:
 
 all_boxes = lp_words_data + pdfplumber_data_refined
 
-# Generate an empty adjacency matrix of the right size
-n_boxes = len(all_boxes)
-graph = np.zeros((n_boxes, n_boxes))
+# Convert all_boxes to a numpy array
+all_boxes_np = np.array([box['coordinates'] for box in all_boxes])
 
-# Iterate over each pair of boxes in lp_words_data_extended
-for i in range(n_boxes):
-    for j in range(i+1, n_boxes): # No need to compute IOU twice for each pair, and IOU of box with itself isn't needed
-        boxA = all_boxes[i]['coordinates']
-        boxB = all_boxes[j]['coordinates']
-        iou = bb_intersection_over_union(boxA, boxB)
-        # If IOU is above the threshold, then set the corresponding entry in the adjacency matrix to 1
-        if iou >= 0.1:
-            graph[i][j] = 1
-            graph[j][i] = 1  # The graph is undirected, so we need to fill in the symmetric entry as well
+x_max = np.maximum(all_boxes_np[:, None, 0], all_boxes_np[:, 0])  # xA in IoU
+y_max = np.maximum(all_boxes_np[:, None, 1], all_boxes_np[:, 1])  # yA in IoU
+x_min = np.minimum(all_boxes_np[:, None, 2], all_boxes_np[:, 2])  # xB in IoU
+y_min = np.minimum(all_boxes_np[:, None, 3], all_boxes_np[:, 3])  # yB in IoU
 
+# Compute areas
+interArea = np.maximum(0, x_min - x_max + 1) * np.maximum(0, y_min - y_max + 1)
+boxAArea = (all_boxes_np[:, 2] - all_boxes_np[:, 0] + 1) * (all_boxes_np[:, 3] - all_boxes_np[:, 1] + 1)
+boxBArea = (all_boxes_np[:, None, 2] - all_boxes_np[:, None, 0] + 1) * (all_boxes_np[:, None, 3] - all_boxes_np[:, None, 1] + 1)
+iou = interArea / (boxAArea + boxBArea - interArea)
+
+# Create adjacency matrix
+graph = (iou >= 0.1).astype(int)
 # Convert to CSR sparse matrix representation
 graph_csr = csr_matrix(graph)
 
