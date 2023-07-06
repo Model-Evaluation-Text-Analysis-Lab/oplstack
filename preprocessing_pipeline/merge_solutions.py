@@ -1,6 +1,11 @@
 #%%
 import json
 import uuid
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
+import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
 
 #%%
 # Function to compute Intersection over Union
@@ -68,4 +73,50 @@ for idx, word in enumerate(pdfplumber_data):
 with open('preprocessing_pipeline/output_files/PDF/merged_output.json', 'w') as f:
     json.dump(lp_words_data_extended, f, indent=4)
     
+# %%
+pdfplumber_data_refined = []
+
+for word in pdfplumber_data:
+    new_word_box = {
+        'uuid': str(uuid.uuid4()),  # generate a new uuid
+        'type': 'text',  # assuming type is 'text' for pdfplumber data
+        'content': "",
+        'coordinates': [word['x0'], word['top'], word['x1'], word['bottom']],
+        'pdfplumber_content': word['text']  # text field in pdfplumber data becomes pdfplumber_content
+    }
+    pdfplumber_data_refined.append(new_word_box)
+
+all_boxes = lp_words_data + pdfplumber_data_refined
+
+# Generate an empty adjacency matrix of the right size
+n_boxes = len(all_boxes)
+graph = np.zeros((n_boxes, n_boxes))
+
+# Iterate over each pair of boxes in lp_words_data_extended
+for i in range(n_boxes):
+    for j in range(i+1, n_boxes): # No need to compute IOU twice for each pair, and IOU of box with itself isn't needed
+        boxA = all_boxes[i]['coordinates']
+        boxB = all_boxes[j]['coordinates']
+        iou = bb_intersection_over_union(boxA, boxB)
+        # If IOU is above the threshold, then set the corresponding entry in the adjacency matrix to 1
+        if iou >= 0.1:
+            graph[i][j] = 1
+            graph[j][i] = 1  # The graph is undirected, so we need to fill in the symmetric entry as well
+
+# Convert to CSR sparse matrix representation
+graph_csr = csr_matrix(graph)
+
+# Find the connected components
+n_components, labels = connected_components(csgraph=graph_csr, directed=False, return_labels=True)
+
+
+# %%
+G = nx.from_numpy_array(graph)
+# nx.draw(G, with_labels=True)
+# plt.show()
+connected_components = [c for c in nx.connected_components(G)]
+print(connected_components)
+
+# %%
+print(nx.__version__)
 # %%
