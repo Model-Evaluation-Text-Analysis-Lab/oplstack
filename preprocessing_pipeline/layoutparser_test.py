@@ -103,28 +103,43 @@ os.makedirs(output_directory, exist_ok=True)
 layout_model, ocr_agent = init_models()
 pdf_layout, images = extract_pages_and_images(input_file_path)
 
-# Process only the first page
-data, word_data, layout, layout_data = process_page(layout_model, ocr_agent, np.array(images[0]))
+# # Process only the first page
+# data, word_data, layout, layout_data = process_page(layout_model, ocr_agent, np.array(images[0]))
 
-#%%
-# Visualize the layout
-vis_image = visualize_layout(np.array(images[0]), layout, word_data)
-# Convert color space from BGR to RGB
-rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
+# Initialize the lists that will hold all the data
+all_word_data = []
+all_layout_data = []
 
-# Display the image
-display(Image.fromarray(rgb_image))
-pil_image = Image.fromarray(rgb_image)
-# Save the image as PDF
-output_pdf_path = "preprocessing_pipeline/output_files/PDF/lp_output.jpg"
-pil_image.save(output_pdf_path, format='JPEG')
+# Process all the pages
+for i, image in enumerate(images):
+    print(f"Processing page {i+1}/{len(images)}...")
+    data, word_data, layout, layout_data = process_page(layout_model, ocr_agent, np.array(image))
 
+    # Visualize the layout
+    vis_image = visualize_layout(np.array(image), layout, word_data)
+    # Convert color space from BGR to RGB
+    rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
+    # Display the image
+    display(Image.fromarray(rgb_image))
+    pil_image = Image.fromarray(rgb_image)
+    # Save the image as JPG
+    output_image_path = f"{output_directory}/lp_output_page_{i+1}.jpg"
+    pil_image.save(output_image_path, format='JPEG')
+
+    # Add the page number to the word and layout data
+    for wd in word_data:
+        wd['page'] = i+1
+    for ld in layout_data:
+        ld['page'] = i+1
+        
+    all_word_data.extend(word_data)
+    all_layout_data.extend(layout_data)
 #%%
 # Save the data as a JSON file
 with open(layout_output_path, 'w') as f:
-    json.dump(layout_data, f, indent=4)
+    json.dump(all_layout_data, f, indent=4)
     
 with open(words_output_path, 'w') as f:
-    json.dump(word_data, f, indent=4)
+    json.dump(all_word_data, f, indent=4)
 
 # %%
