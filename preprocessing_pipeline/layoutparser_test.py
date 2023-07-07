@@ -48,12 +48,13 @@ def process_page(layout_model, ocr_agent, image, confidence_threshold=0):
             
             # Add the top left corner coordinates of segment_image to each word's bounding box
             word_coordinates = (row.left + block.coordinates[0], row.top + block.coordinates[1], row.left + row.width + block.coordinates[0], row.top + row.height + block.coordinates[1])
-            word_info = {"uid": str(uuid.uuid4()), "type": "Word", "content": row['text'], "coordinates": word_coordinates}
+            word_info = {"uid": str(uuid.uuid4()), "type": "Word", "content": row['text'], "source": "lp", "coordinates": word_coordinates}
             word_data.append(word_info)
 
         layout_data.append({
             "type": block.type,
             "id": str(uuid.uuid4()),
+            "source": "lp",
             "content": block_text.strip(),  # Remove leading and trailing spaces
             "coordinates": block.coordinates,
         })

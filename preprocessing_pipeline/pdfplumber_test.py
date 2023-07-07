@@ -5,6 +5,7 @@ from PIL import ImageDraw
 from IPython.display import display
 import json
 import os
+import uuid
 
 
 #%%
@@ -16,8 +17,20 @@ def extract_words_from_pdf(pdf_path):
 
         # Extract words
         words = first_page.extract_words(x_tolerance=2)
+        
+        # Refine the words into the desired format
+        refined_words = []
+        for word in words:
+            refined_word = {
+                'uid': str(uuid.uuid4()),
+                'type': 'word',
+                'content': word['text'],
+                'source': 'pdfplumber',
+                'coordinates': [word['x0'], word['top'], word['x1'], word['bottom']],
+            }
+            refined_words.append(refined_word)
     
-    return words, first_page.width, first_page.height
+    return refined_words, first_page.width, first_page.height
 
 #%%
 def generate_and_display_image(pdf_path, words, page_width, page_height):
@@ -35,7 +48,7 @@ def generate_and_display_image(pdf_path, words, page_width, page_height):
     # Loop over the words and draw rectangles
     for word in words:
         # The word dictionary contains the coordinates of the bounding box
-        x0, y0, x1, y1 = word['x0'], word['top'], word['x1'], word['bottom']
+        x0, y0, x1, y1 = word['coordinates']
         # Scale the coordinates
         x0 *= scale_x
         y0 *= scale_y

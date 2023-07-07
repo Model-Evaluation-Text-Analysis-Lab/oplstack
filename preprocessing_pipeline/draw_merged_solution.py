@@ -73,8 +73,8 @@ scale_y = height / pdf_height_points
 # Apply the scale factors when drawing boxes and adding text
 for item in data:
     coords = [c * scale_x if i % 2 == 0 else c * scale_y for i, c in enumerate(item['coordinates'])]
-    content = item['pdfplumber_content']
-    original_content = item['content']
+    content = item['content']
+    original_content =  item['discarded_content']
     box_width = coords[2] - coords[0]
     box_height = coords[3] - coords[1]
     currentAxis.add_patch(
@@ -85,7 +85,7 @@ for item in data:
     text_y = coords[1] + box_height * 0.5  # Adjust the offset to position the text vertically inside the box
 
     # Add the original content just above the current content
-    plt.text(text_x, text_y - box_height * 0.9, original_content, fontsize=2, color='purple')
+    plt.text(text_x, text_y - box_height * 0.2, original_content, fontsize=2, color='purple')
     
     # Add the current content
     plt.text(text_x, text_y, content, fontsize=4, color='blue')
