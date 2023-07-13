@@ -5,10 +5,9 @@ import numpy as np
 import uuid
 
 
-def merge_boxes(lp_words_data, pdfplumber_data):
-    all_boxes = lp_words_data + pdfplumber_data
+def merge_boxes(all_word_data):
     boxes_by_page = {}
-    for box in all_boxes:
+    for box in all_word_data:
         page = box['page']
         if page not in boxes_by_page:
             boxes_by_page[page] = []

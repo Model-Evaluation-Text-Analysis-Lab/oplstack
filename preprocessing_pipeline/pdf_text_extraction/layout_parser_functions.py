@@ -1,11 +1,9 @@
 import layoutparser as lp
 import json
-from PIL import Image
 import numpy as np
 import cv2
 import uuid
 import os
-
 
 def init_models():
     layout_model = lp.Detectron2LayoutModel(
@@ -20,7 +18,7 @@ def init_models():
 
 def extract_pages_and_images(file_path):
     pdf_layout, images = lp.load_pdf(file_path, load_images=True)
-    return pdf_layout, images
+    return pdf_layout, [np.array(im) for im in images]
 
 
 def process_page(layout_model, ocr_agent, image, i, confidence_threshold=0):
@@ -78,28 +76,40 @@ def process_page(layout_model, ocr_agent, image, i, confidence_threshold=0):
     return page_data, word_data, layout, layout_data
 
 
-def visualize_layout(image, layout, word_data):
+def visualize_layout(image, layout, word_data, i):
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(image)
+    currentAxis = plt.gca()
+
     for block in layout:
         x1, y1, x2, y2 = block.coordinates
         if block.type == "Text":
-            color = (0, 255, 0)
+            color = 'green'  # set the color in RGB format
         elif block.type == "Title":
-            color = (255, 0, 0)
+            color = 'red'
         elif block.type == "List":
-            color = (0, 255, 255)
+            color = 'cyan'
         elif block.type == "Table":
-            color = (255, 255, 0)
+            color = 'yellow'
         elif block.type == "Figure":
-            color = (0, 0, 255)
+            color = 'blue'
         else:
-            color = (0, 0, 0)
-
-        image = cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 1)
+            color = 'black'
+        currentAxis.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1, fill=None, edgecolor=color, linewidth=2))
 
     # draw the word level bounding boxes
     for word in word_data:
         x1, y1, x2, y2 = word['coordinates']
-        color = (0, 165, 255)
-        image = cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 1)
+        color = 'orange'  # set the color in RGB format
+        currentAxis.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1, fill=None, edgecolor=color, linewidth=2))
 
-    return image
+    output_filename = f'preprocessing_pipeline/output_files/visuals/layout_visualization_page_{i+1}.pdf'
+    plt.savefig(output_filename, bbox_inches='tight', pad_inches = 0)
+    plt.close()
+
+    return output_filename
