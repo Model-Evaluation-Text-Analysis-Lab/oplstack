@@ -136,12 +136,13 @@ def add_new_layout_data(new_layout_data, _type, source, content, coordinates, pa
 
 def generate_tree(new_layout_data):
     tree = []
+    stack = []
+
     for page in set(box['page'] for box in new_layout_data):
         page_boxes = [box for box in new_layout_data if box['page'] == page]
         # Sort boxes by their y coordinate first, then by their x coordinate
         page_boxes.sort(key=lambda box: (box['coordinates'][1], box['coordinates'][0]))
 
-        current_parent = None
         for box in page_boxes:
             node = {
                 'type': box['type'],
@@ -153,11 +154,19 @@ def generate_tree(new_layout_data):
                 'children': [],
             }
 
-            if box['type'] == 'Title' or current_parent is None:
+            # If it's a Title, or stack is empty (it's the first node), we push it to the stack and add it to the tree
+            if box['type'] == 'Title' or not stack:
+                stack.append(node)
                 tree.append(node)
-                current_parent = node
             else:
-                current_parent['children'].append(node)
+                # Otherwise, it's a Text node, and we add it as a child of the node on top of the stack
+                stack[-1]['children'].append(node)
+
+            # If it's a Title, and there's more than one node in the stack, we pop nodes until we find a Title node
+            if box['type'] == 'Title' and len(stack) > 1:
+                while len(stack) > 1:
+                    stack.pop()
 
     return tree
+
 
