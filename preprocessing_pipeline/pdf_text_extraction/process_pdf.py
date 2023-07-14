@@ -59,7 +59,7 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
         end = time.time()
         print("PyMuPDF processing took", end - start, "seconds")
 
-    all_word_data = lp_all_word_data + pdfplumber_all_words
+    all_word_data = pdfplumber_all_words
     merged_boxes, new_layout_data = merge_boxes(all_word_data, lp_all_layout_data)
 
     with open('preprocessing_pipeline/output_files/merged_boxes.json', 'w') as f:
