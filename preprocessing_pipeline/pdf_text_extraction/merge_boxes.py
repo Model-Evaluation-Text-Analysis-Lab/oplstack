@@ -4,8 +4,7 @@ from scipy.sparse.csgraph import connected_components
 import numpy as np
 import uuid
 
-
-def merge_boxes(all_word_data):
+def merge_boxes(all_word_data, layout_data):
     boxes_by_page = {}
     for box in all_word_data:
         page = box['page']
@@ -14,6 +13,7 @@ def merge_boxes(all_word_data):
         boxes_by_page[page].append(box)
 
     new_boxes = []
+    new_layout_data = []
 
     for page, boxes in boxes_by_page.items():
         boxes_np = np.array([box['coordinates'] for box in boxes])
@@ -55,9 +55,9 @@ def merge_boxes(all_word_data):
                 coordinates.append(box['coordinates'])
 
             x_min = min(coordinate[0] for coordinate in coordinates)
-            y_min = max(coordinate[1] for coordinate in coordinates)
+            y_min = min(coordinate[1] for coordinate in coordinates)
             x_max = max(coordinate[2] for coordinate in coordinates)
-            y_max = min(coordinate[3] for coordinate in coordinates)
+            y_max = max(coordinate[3] for coordinate in coordinates)
             union_coordinates = [x_min, y_min, x_max, y_max]
 
             new_boxes.append({
@@ -69,4 +69,67 @@ def merge_boxes(all_word_data):
                 'page': page
             })
 
-    return new_boxes
+        # Construct new layout data
+        for layout in layout_data:
+            if layout['page'] != page:
+                continue
+
+            layout_content = ""
+            layout_box = layout['coordinates']
+            for box in new_boxes:
+                box_coordinates = box['coordinates']
+                if max(layout_box[0], box_coordinates[0]) <= min(layout_box[2], box_coordinates[2]) and \
+                max(layout_box[1], box_coordinates[1]) <= min(layout_box[3], box_coordinates[3]):
+                    layout_content += " " + box['content']
+
+            new_layout_data.append({
+                "type": layout['type'],
+                "id": str(uuid.uuid4()),
+                "source": "lp",
+                "content": layout_content.strip(),
+                "coordinates": layout_box,
+                "page": page  # Add the page number
+            })
+
+        # Handle non-overlapping boxes
+        non_overlapping_boxes = [box for box in new_boxes if not any(
+            max(layout_box['coordinates'][0], box['coordinates'][0]) <= min(layout_box['coordinates'][2], box['coordinates'][2]) and \
+            max(layout_box['coordinates'][1], box['coordinates'][1]) <= min(layout_box['coordinates'][3], box['coordinates'][3])
+
+            for layout_box in layout_data if layout_box['page'] == page
+        )]
+        non_overlapping_boxes.sort(key=lambda box: box['coordinates'][0])
+        threshold = 50  # Increasing the threshold value will make the grouping criterion less stringent. This means that boxes can be farther apart and still be grouped together
+        group = []
+        for box in non_overlapping_boxes:
+            if not group or abs(box['coordinates'][1] - group[-1]['coordinates'][1]) < threshold:
+                group.append(box)
+            else:
+                sentence, coordinates = merge_group(group)
+                add_new_layout_data(new_layout_data, "text", "pdfplumber", sentence, coordinates, page)
+                group = [box]
+        if group:
+            sentence, coordinates = merge_group(group)
+            add_new_layout_data(new_layout_data, "text", "pdfplumber", sentence, coordinates, page)
+                
+    return new_boxes, new_layout_data
+
+def merge_group(group):
+    sentence = ' '.join(b['content'] for b in group)
+    coordinates = [
+        min(b['coordinates'][0] for b in group),
+        min(b['coordinates'][1] for b in group),
+        max(b['coordinates'][2] for b in group),
+        max(b['coordinates'][3] for b in group),
+    ]
+    return sentence, coordinates
+
+def add_new_layout_data(new_layout_data, _type, source, content, coordinates, page):
+    new_layout_data.append({
+        "type": _type,
+        "id": str(uuid.uuid4()),
+        "source": source,
+        "content": content,
+        "coordinates": coordinates,
+        "page": page,
+    })

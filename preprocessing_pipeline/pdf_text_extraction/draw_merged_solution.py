@@ -39,16 +39,16 @@ for item in bounding_boxes:
     bounding_boxes_by_page[page].append(item)
 
 # Load the bounding box data from PyMuPDF
-with open('preprocessing_pipeline/output_files/PDF/pymupdf_output.json', 'r') as f:
-    pymupdf_bounding_boxes = json.load(f)
+# with open('preprocessing_pipeline/output_files/PDF/pymupdf_output.json', 'r') as f:
+#     pymupdf_bounding_boxes = json.load(f)
 
-# Group bounding box data by page for PyMuPDF
-pymupdf_bounding_boxes_by_page = {}
-for item in pymupdf_bounding_boxes:
-    page = item['page']
-    if page not in pymupdf_bounding_boxes_by_page:
-        pymupdf_bounding_boxes_by_page[page] = []
-    pymupdf_bounding_boxes_by_page[page].append(item)
+# # Group bounding box data by page for PyMuPDF
+# pymupdf_bounding_boxes_by_page = {}
+# for item in pymupdf_bounding_boxes:
+#     page = item['page']
+#     if page not in pymupdf_bounding_boxes_by_page:
+#         pymupdf_bounding_boxes_by_page[page] = []
+#     pymupdf_bounding_boxes_by_page[page].append(item)
 
 
 # Create a PdfMerger object
@@ -78,16 +78,16 @@ for page_number, img in enumerate(images, start=1):
     page_bounding_boxes = bounding_boxes_by_page[page_number]
 
     # Get the bounding boxes for this page from PyMuPDF
-    page_pymupdf_bounding_boxes = pymupdf_bounding_boxes_by_page[page_number]
+    # page_pymupdf_bounding_boxes = pymupdf_bounding_boxes_by_page[page_number]
 
-    # Draw the bounding boxes from PyMuPDF
-    for item in page_pymupdf_bounding_boxes:
-        coordinates = [c * scale_x if i % 2 == 0 else c * scale_y for i, c in enumerate(item['coordinates'])]
-        block_type = item['type']
-        color = 'green'  # Change the colors as needed for PyMuPDF
-        currentAxis.add_patch(
-            plt.Rectangle((coordinates[0], coordinates[1]), coordinates[2] - coordinates[0], coordinates[3] - coordinates[1],
-                        fill=None, edgecolor=color, linewidth=2))
+    # # Draw the bounding boxes from PyMuPDF
+    # for item in page_pymupdf_bounding_boxes:
+    #     coordinates = [c * scale_x if i % 2 == 0 else c * scale_y for i, c in enumerate(item['coordinates'])]
+    #     block_type = item['type']
+    #     color = 'green'  # Change the colors as needed for PyMuPDF
+    #     currentAxis.add_patch(
+    #         plt.Rectangle((coordinates[0], coordinates[1]), coordinates[2] - coordinates[0], coordinates[3] - coordinates[1],
+    #                     fill=None, edgecolor=color, linewidth=2))
 
     # Draw the bounding boxes
     for item in page_bounding_boxes:
