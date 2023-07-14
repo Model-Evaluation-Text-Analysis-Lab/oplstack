@@ -133,3 +133,31 @@ def add_new_layout_data(new_layout_data, _type, source, content, coordinates, pa
         "coordinates": coordinates,
         "page": page,
     })
+
+def generate_tree(new_layout_data):
+    tree = []
+    for page in set(box['page'] for box in new_layout_data):
+        page_boxes = [box for box in new_layout_data if box['page'] == page]
+        # Sort boxes by their y coordinate first, then by their x coordinate
+        page_boxes.sort(key=lambda box: (box['coordinates'][1], box['coordinates'][0]))
+
+        current_parent = None
+        for box in page_boxes:
+            node = {
+                'type': box['type'],
+                'id': box['id'],
+                'source': box['source'],
+                'content': box['content'],
+                'coordinates': box['coordinates'],
+                'page': box['page'],
+                'children': [],
+            }
+
+            if box['type'] == 'Title' or current_parent is None:
+                tree.append(node)
+                current_parent = node
+            else:
+                current_parent['children'].append(node)
+
+    return tree
+

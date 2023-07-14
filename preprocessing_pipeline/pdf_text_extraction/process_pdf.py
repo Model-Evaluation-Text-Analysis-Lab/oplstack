@@ -2,7 +2,7 @@ import time
 from layout_parser_functions import init_models, extract_pages_and_images, process_page, visualize_layout
 from pdfplumber_functions import extract_words_from_pdf, generate_and_display_images_pdfplumber
 #from pymupdf_functions import extract_words_from_pdf_pymupdf, generate_and_display_images_pymupdf
-from merge_boxes import merge_boxes
+from merge_boxes import merge_boxes, generate_tree
 import json, os
 
 def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_pymupdf=True, generate_images=False):
@@ -71,4 +71,7 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
     return merged_boxes, new_layout_data
 
 if __name__ == "__main__":
-    process_pdf("preprocessing_pipeline/documents/complex.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=False)
+    merged_boxes, merged_layout_data = process_pdf("preprocessing_pipeline/documents/complex.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=False)
+    pdf_tree = generate_tree(merged_layout_data)
+    with open('preprocessing_pipeline/output_files/pdf_tree_data.json', 'w') as f:
+        json.dump(pdf_tree, f, indent=4)
