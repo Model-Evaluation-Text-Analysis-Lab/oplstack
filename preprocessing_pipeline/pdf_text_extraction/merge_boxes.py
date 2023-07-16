@@ -3,8 +3,9 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 import numpy as np
 import uuid
+from sklearn.cluster import KMeans
 
-def merge_boxes(all_word_data, layout_data):
+def merge_boxes(all_word_data, layout_data, source):
     boxes_by_page = {}
     for box in all_word_data:
         page = box['page']
@@ -68,7 +69,8 @@ def merge_boxes(all_word_data, layout_data):
                 'content': content.strip(),
                 'discarded_content': discarded_content.strip(),
                 'coordinates': union_coordinates,
-                'page': page
+                'page': page,
+                'source': source
             })
 
         new_boxes.extend(new_boxes_page)  # extend new_boxes with the new boxes of this page
@@ -105,34 +107,14 @@ def merge_boxes(all_word_data, layout_data):
             new_layout_data.append({
                 "type": layout['type'],
                 "id": str(uuid.uuid4()),
-                "source": "lp",
+                "source": source,
                 "content": layout_content.strip(),
                 "coordinates": layout_box,
                 "page": page  # Add the page number
             }) 
 
-        # Handle non-overlapping boxes
-        non_overlapping_boxes = [box for box in new_boxes if not any(
-            max(layout_box['coordinates'][0], box['coordinates'][0]) <= min(layout_box['coordinates'][2], box['coordinates'][2]) and \
-            max(layout_box['coordinates'][1], box['coordinates'][1]) <= min(layout_box['coordinates'][3], box['coordinates'][3])
-
-            for layout_box in layout_data if layout_box['page'] == page
-        )]
-        non_overlapping_boxes.sort(key=lambda box: box['coordinates'][0])
-        threshold = 100  # Increasing the threshold value will make the grouping criterion less stringent. This means that boxes can be farther apart and still be grouped together
-        group = []
-        for box in non_overlapping_boxes:
-            if not group or abs(box['coordinates'][1] - group[-1]['coordinates'][1]) < threshold:
-                group.append(box)
-            else:
-                sentence, coordinates = merge_group(group)
-                add_new_layout_data(new_layout_data, "text", "pdfplumber", sentence, coordinates, page)
-                group = [box]
-        if group:
-            sentence, coordinates = merge_group(group)
-            add_new_layout_data(new_layout_data, "text", "pdfplumber", sentence, coordinates, page)
-                
     return new_boxes, new_layout_data
+
 
 def merge_group(group):
     sentence = ' '.join(b['content'] for b in group)
@@ -154,6 +136,7 @@ def add_new_layout_data(layout_data, _type, source, content, coordinates, page):
         "page": page  # Add the page number
     })
 
+
 def generate_tree(new_layout_data):
     tree = {}
 
@@ -161,10 +144,9 @@ def generate_tree(new_layout_data):
         tree[page] = []
         stack = []
         page_boxes = [box for box in new_layout_data if box['page'] == page]
-        # Sort boxes by their y coordinate first, then by their x coordinate
-        page_boxes.sort(key=lambda box: (box['coordinates'][1], box['coordinates'][0]))
+        sorted_boxes = sorted(page_boxes, key=lambda x: x['coordinates'][1])
 
-        for box in page_boxes:
+        for box in sorted_boxes:
             node = {
                 'type': box['type'],
                 'id': box['id'],
@@ -173,19 +155,25 @@ def generate_tree(new_layout_data):
                 'coordinates': box['coordinates'],
                 'page': box['page'],
                 'children': [],
+                'size': box.get('size', None),
+                'level': int(box.get('level', 0))
             }
 
-            # If it's a Title, or stack is empty (it's the first node), we push it to the stack and add it to the tree
-            if box['type'] == 'Title' or not stack:
+            if not stack:
                 stack.append(node)
                 tree[page].append(node)
             else:
-                # Otherwise, it's a Text node, and we add it as a child of the node on top of the stack
-                stack[-1]['children'].append(node)
-
-            # If it's a Title, and there's more than one node in the stack, we pop nodes until we find a Title node
-            if box['type'] == 'Title' and len(stack) > 1:
-                while len(stack) > 1:
-                    stack.pop()
+                if node['level'] > stack[-1]['level']:
+                    stack[-1]['children'].append(node)
+                    stack.append(node)
+                else:
+                    while stack and node['level'] <= stack[-1]['level']:
+                        stack.pop()
+                    if stack:
+                        stack[-1]['children'].append(node)
+                        stack.append(node)
+                    else:
+                        stack.append(node)
+                        tree[page].append(node)
 
     return tree

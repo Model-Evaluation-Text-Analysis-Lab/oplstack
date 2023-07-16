@@ -14,20 +14,22 @@ def extract_words_from_pdf_pymupdf(pdf_path):
 
         blocks = page.get_text("dict")["blocks"]
         for b in blocks:  
-            if b['type'] == 0:  
+            if b['type'] == 0:  # this block contains text
                 for l in b["lines"]:  
-                    for s in l["spans"]:  
-                        text = s['text']
-                        bbox = s['bbox']
-                        refined_word = {
-                            'uid': str(uuid.uuid4()),
-                            'type': 'word',
-                            'content': text,
-                            'source': 'pymupdf',
-                            'coordinates': [bbox[0], bbox[1], bbox[2], bbox[3]],
-                            'page': i+1,
-                        }
-                        all_words.append(refined_word)
+                    for s in l["spans"]:
+                        # split the text in the span into words
+                        for word in s['text'].split():
+                            bbox = s['bbox']
+                            refined_word = {
+                                'uid': str(uuid.uuid4()),
+                                'type': 'word',
+                                'content': word,
+                                'source': 'pymupdf',
+                                'coordinates': [bbox[0], bbox[1], bbox[2], bbox[3]],
+                                'page': i+1,
+                                'size': s['size'],  # add size here
+                            }
+                            all_words.append(refined_word)
 
     return all_words
 

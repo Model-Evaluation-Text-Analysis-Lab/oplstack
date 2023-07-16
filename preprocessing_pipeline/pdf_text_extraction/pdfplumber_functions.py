@@ -30,6 +30,7 @@ def extract_words_from_pdf(pdf_path):
     return all_words
 
 
+
 def generate_and_display_images_pdfplumber(pdf_path, all_words):
     from matplotlib.patches import Rectangle
     import matplotlib.pyplot as plt

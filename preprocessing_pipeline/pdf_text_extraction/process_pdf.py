@@ -1,7 +1,7 @@
 import time
 from layout_parser_functions import init_models, extract_pages_and_images, process_page, visualize_layout
 from pdfplumber_functions import extract_words_from_pdf, generate_and_display_images_pdfplumber
-#from pymupdf_functions import extract_words_from_pdf_pymupdf, generate_and_display_images_pymupdf
+from pymupdf_functions import extract_words_from_pdf_pymupdf, generate_and_display_images_pymupdf
 from merge_boxes import merge_boxes, generate_tree
 import json, os
 
@@ -30,7 +30,7 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
         with open('preprocessing_pipeline/output_files/PDF/lp_output_words.json', 'w') as f:
             json.dump(lp_all_word_data, f, indent=4)
         
-        with open('preprocessing_pipeline/output_files/PDF/lp_output_words.json', 'w') as f:
+        with open('preprocessing_pipeline/output_files/PDF/lp_output_layout.json', 'w') as f:
             json.dump(lp_all_layout_data, f, indent=4)
         end = time.time()
         print("LayoutParser processing took", end - start, "seconds")
@@ -59,19 +59,33 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
         end = time.time()
         print("PyMuPDF processing took", end - start, "seconds")
 
-    all_word_data = pdfplumber_all_words
-    merged_boxes, new_layout_data = merge_boxes(all_word_data, lp_all_layout_data)
+    all_word_data_pdfplumber = pdfplumber_all_words
+    merged_boxes_pdfplumber, new_layout_data_pdfplumber = merge_boxes(all_word_data_pdfplumber, lp_all_layout_data, 'pdfplumber')
 
-    with open('preprocessing_pipeline/output_files/merged_boxes.json', 'w') as f:
-        json.dump(merged_boxes, f, indent=4)
+    all_word_data_pymupdf = pymupdf_all_words
+    merged_boxes_pymupdf, new_layout_data_pymupdf = merge_boxes(all_word_data_pymupdf, lp_all_layout_data, 'pymupdf')
+
+    with open('preprocessing_pipeline/output_files/PDF/merged_boxes_lp_pdfplumber.json', 'w') as f:
+        json.dump(merged_boxes_pdfplumber, f, indent=4)
         
-    with open('preprocessing_pipeline/output_files/new_layout_data.json', 'w') as f:
-        json.dump(new_layout_data, f, indent=4)
+    with open('preprocessing_pipeline/output_files/PDF/new_layout_data_lp_pdfplumber.json', 'w') as f:
+        json.dump(new_layout_data_pdfplumber, f, indent=4)
+        
+    with open('preprocessing_pipeline/output_files/PDF/merged_boxes_lp_pymupdf.json', 'w') as f:
+        json.dump(merged_boxes_pymupdf, f, indent=4)
+        
+    with open('preprocessing_pipeline/output_files/PDF/new_layout_data_lp_pymupdf.json', 'w') as f:
+        json.dump(new_layout_data_pymupdf, f, indent=4)
 
-    return merged_boxes, new_layout_data
+    pdf_tree_pdfplumber = generate_tree(new_layout_data_pdfplumber)
+    with open('preprocessing_pipeline/output_files/PDF/pdf_tree_data_pdfplumber.json', 'w') as f:
+        json.dump(pdf_tree_pdfplumber, f, indent=4)
+
+    pdf_tree_pymupdf = generate_tree(new_layout_data_pymupdf)
+    with open('preprocessing_pipeline/output_files/PDF/pdf_tree_data_pymupdf.json', 'w') as f:
+        json.dump(pdf_tree_pymupdf, f, indent=4)
+
+    return merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf
 
 if __name__ == "__main__":
-    merged_boxes, merged_layout_data = process_pdf("preprocessing_pipeline/documents/complex.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=False)
-    pdf_tree = generate_tree(merged_layout_data)
-    with open('preprocessing_pipeline/output_files/pdf_tree_data.json', 'w') as f:
-        json.dump(pdf_tree, f, indent=4)
+    merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf = process_pdf("preprocessing_pipeline/documents/complex.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=True, generate_images=False)
