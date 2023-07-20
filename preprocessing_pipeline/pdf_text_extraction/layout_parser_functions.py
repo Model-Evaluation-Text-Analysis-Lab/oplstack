@@ -31,85 +31,139 @@ def process_page(layout_model, ocr_agent, image, i, confidence_threshold=0):
     text_blocks = lp.Layout([b for b in text_blocks if not any(b.is_in(b_fig) for b_fig in figure_blocks)])
     
     h, w = image.shape[:2]
-
-    # Determine the number of columns
-    x_ranges = [(block.coordinates[0], block.coordinates[2]) for block in text_blocks]
-    x_clusters = cluster_objects(x_ranges, key_fn=lambda x: sum(x)/2, tolerance=w/4)
     
-    x_cluster_blocks = [[] for _ in range(len(x_clusters))]
-
-    # assign each block to the closest cluster
-    for block in text_blocks:
-        x_center = (block.coordinates[0] + block.coordinates[2]) / 2
-        min_distance = float('inf')
-        closest_cluster_idx = None
-        for idx, x_cluster in enumerate(x_clusters):
-            cluster_center = sum(x_cluster[0]) / 2
-            distance = abs(x_center - cluster_center)
-            if distance < min_distance:
-                min_distance = distance
-                closest_cluster_idx = idx
-        x_cluster_blocks[closest_cluster_idx].append(block)
-
-    # sort blocks in each cluster and combine all clusters into a single list
-    column_blocks = []
-    for cluster_blocks in x_cluster_blocks:
-        cluster_blocks.sort(key=lambda b: b.coordinates[1])
-        column_blocks.extend(cluster_blocks)
-
-    text_blocks = lp.Layout(column_blocks)
+    # Find horizontal blocks that span at least 80% of the page width
+    span_blocks = [b for b in text_blocks if b.width / w > 0.8]
+    span_blocks.sort(key=lambda b: b.coordinates[1])  # sort by y-coordinate
     
-    # And finally add the index according to the order
-    text_blocks = lp.Layout([b.set(id=idx) for idx, b in enumerate(text_blocks)])
-    
+    # Add the very top and bottom of the page to the list of "cut points"
+    cut_points = [0] + [b.coordinates[3] for b in span_blocks] + [h]  # top y-coordinates of span_blocks + page height
+
+    segments = []
+    for start, end in zip(cut_points[:-1], cut_points[1:]):
+        segment_blocks = lp.Layout([b for b in text_blocks if b.coordinates[1] >= start and b.coordinates[3] <= end])
+        segments.append(segment_blocks)
+
+    global_reading_order = 0  # Global reading order index
     page_data = []
     layout_data = []
-    for block in text_blocks:
-        segment_image = (block
+    for segment_blocks in segments:
+        if len(segment_blocks) == 1 and segment_blocks[0].width / w > 0.8:
+            # If the segment has only one block and it spans the width of the page, handle it separately
+            block = segment_blocks[0]
+            block.id = global_reading_order
+            global_reading_order += 1
+            segment_image = (block
                         .pad(left=5, right=5, top=5, bottom=5)
                         .crop_image(image))
 
-        res = ocr_agent.detect(segment_image, return_response=True, agg_output_level=lp.TesseractFeatureType.WORD)
+            res = ocr_agent.detect(segment_image, return_response=True, agg_output_level=lp.TesseractFeatureType.WORD)
 
-        block_text = ""  # Initialize an empty string to store the OCR text for this block
-        word_data = []  # Initialize an empty list to store the word data for this block
-        for index, row in res['data'].iterrows():
-            if row['conf'] < confidence_threshold:
-                continue
-            block_text += " " + row['text']  # Append each word's text to the block_text
+            block_text = ""  # Initialize an empty string to store the OCR text for this block
+            word_data = []  # Initialize an empty list to store the word data for this block
+            for index, row in res['data'].iterrows():
+                if row['conf'] < confidence_threshold:
+                    continue
+                block_text += " " + row['text']  # Append each word's text to the block_text
 
-            # Add the top left corner coordinates of segment_image to each word's bounding box
-            word_coordinates = (
-                row.left + block.coordinates[0],
-                row.top + block.coordinates[1],
-                row.left + row.width + block.coordinates[0],
-                row.top + row.height + block.coordinates[1]
-            )
-            word_info = {
-                "uid": str(uuid.uuid4()),
-                "type": "Word",
-                "content": row['text'],
+                # Add the top left corner coordinates of segment_image to each word's bounding box
+                word_coordinates = (
+                    row.left + block.coordinates[0],
+                    row.top + block.coordinates[1],
+                    row.left + row.width + block.coordinates[0],
+                    row.top + row.height + block.coordinates[1]
+                )
+                word_info = {
+                    "uid": str(uuid.uuid4()),
+                    "type": "Word",
+                    "content": row['text'],
+                    "source": "lp",
+                    "coordinates": word_coordinates,
+                    "page": i+1  # Add the page number
+                }
+                word_data.append(word_info)
+            
+            layout_data.append({
+                "type": block.type,
+                "id": str(uuid.uuid4()),
+                "reading_order": block.id,
                 "source": "lp",
-                "coordinates": word_coordinates,
+                "content": block_text.strip(),
+                "coordinates": block.coordinates,
                 "page": i+1  # Add the page number
-            }
-            word_data.append(word_info)
+            })
 
-        layout_data.append({
-            "type": block.type,
-            "id": str(uuid.uuid4()),
-            "reading_order": block.id,
-            "source": "lp",
-            "content": block_text.strip(),
-            "coordinates": block.coordinates,
-            "page": i+1  # Add the page number
-        })
+            page_data.extend(word_data)
+        else:
+            # Your existing column detection and clustering code, applied to segment_blocks
+            # This assumes that cluster_objects is a function you have defined elsewhere
+            x_ranges = [(block.coordinates[0], block.coordinates[2]) for block in segment_blocks]
+            x_clusters = cluster_objects(x_ranges, key_fn=lambda x: sum(x)/2, tolerance=w/4)
 
-        page_data.extend(word_data)
+            x_cluster_blocks = [[] for _ in range(len(x_clusters))]
+
+            # Assign each block to the closest cluster
+            for block in segment_blocks:
+                x_center = (block.coordinates[0] + block.coordinates[2]) / 2
+                min_distance = float('inf')
+                closest_cluster_idx = None
+                for idx, x_cluster in enumerate(x_clusters):
+                    cluster_center = sum(x_cluster[0]) / 2
+                    distance = abs(x_center - cluster_center)
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_cluster_idx = idx
+                x_cluster_blocks[closest_cluster_idx].append(block)
+
+            for idx, cluster_blocks in enumerate(x_cluster_blocks):
+                cluster_blocks.sort(key=lambda b: b.coordinates[1])
+                cluster_blocks = lp.Layout([b.set(id=global_reading_order + idx) for idx, b in enumerate(cluster_blocks)])
+                global_reading_order += len(cluster_blocks)
+
+                for block in cluster_blocks:
+                    segment_image = (block
+                                .pad(left=5, right=5, top=5, bottom=5)
+                                .crop_image(image))
+
+                    res = ocr_agent.detect(segment_image, return_response=True, agg_output_level=lp.TesseractFeatureType.WORD)
+
+                    block_text = ""  # Initialize an empty string to store the OCR text for this block
+                    word_data = []  # Initialize an empty list to store the word data for this block
+                    for index, row in res['data'].iterrows():
+                        if row['conf'] < confidence_threshold:
+                            continue
+                        block_text += " " + row['text']  # Append each word's text to the block_text
+
+                        # Add the top left corner coordinates of segment_image to each word's bounding box
+                        word_coordinates = (
+                            row.left + block.coordinates[0],
+                            row.top + block.coordinates[1],
+                            row.left + row.width + block.coordinates[0],
+                            row.top + row.height + block.coordinates[1]
+                        )
+                        word_info = {
+                            "uid": str(uuid.uuid4()),
+                            "type": "Word",
+                            "content": row['text'],
+                            "source": "lp",
+                            "coordinates": word_coordinates,
+                            "page": i+1  # Add the page number
+                        }
+                        word_data.append(word_info)
+
+                    layout_data.append({
+                        "type": block.type,
+                        "id": str(uuid.uuid4()),
+                        "reading_order": block.id,
+                        "source": "lp",
+                        "content": block_text.strip(),
+                        "coordinates": block.coordinates,
+                        "page": i+1  # Add the page number
+                    })
+
+                    page_data.extend(word_data)
 
     return page_data, layout, layout_data
-
-
 
 def visualize_layout(image, layout, word_data, layout_data, i):
     import matplotlib.pyplot as plt
