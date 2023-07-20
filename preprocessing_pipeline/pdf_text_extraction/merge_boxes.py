@@ -58,9 +58,9 @@ def merge_boxes(all_word_data, layout_data, source):
                 coordinates.append(box['coordinates'])
 
             x_min = min(coordinate[0] for coordinate in coordinates)
-            y_min = max(coordinate[1] for coordinate in coordinates)
+            y_min = min(coordinate[1] for coordinate in coordinates)
             x_max = max(coordinate[2] for coordinate in coordinates)
-            y_max = min(coordinate[3] for coordinate in coordinates)
+            y_max = max(coordinate[3] for coordinate in coordinates)
             union_coordinates = [x_min, y_min, x_max, y_max]
 
             new_boxes_page.append({
@@ -73,8 +73,8 @@ def merge_boxes(all_word_data, layout_data, source):
                 'source': source
             })
 
-        new_boxes.extend(new_boxes_page)  # extend new_boxes with the new boxes of this page
-        new_boxes_by_page[page] = new_boxes_page  # save new_boxes_page to new_boxes_by_page
+        new_boxes.extend(new_boxes_page)
+        new_boxes_by_page[page] = new_boxes_page
 
         # Construct new layout data
         for layout in layout_data:
@@ -83,7 +83,8 @@ def merge_boxes(all_word_data, layout_data, source):
 
             layout_content = ""
             layout_box = layout['coordinates']
-            for box in new_boxes_by_page[page]:  # use new_boxes_by_page[page] instead of new_boxes
+            reading_order = layout['reading_order']
+            for box in new_boxes_by_page[page]:
                 box_coordinates = box['coordinates']
                 
                 xA = max(layout_box[0], box_coordinates[0])
@@ -110,6 +111,7 @@ def merge_boxes(all_word_data, layout_data, source):
                 "source": source,
                 "content": layout_content.strip(),
                 "coordinates": layout_box,
+                "reading_order": reading_order,
                 "page": page  # Add the page number
             }) 
 
