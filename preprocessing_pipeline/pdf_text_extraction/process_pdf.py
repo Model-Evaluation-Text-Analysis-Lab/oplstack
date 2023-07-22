@@ -2,7 +2,8 @@ import time
 from layout_parser_functions import init_models, extract_pages_and_images, process_page, visualize_layout
 from pdfplumber_functions import extract_words_from_pdf, generate_and_display_images_pdfplumber
 #from pymupdf_functions import extract_words_from_pdf_pymupdf, generate_and_display_images_pymupdf
-from merge_boxes import merge_boxes, generate_tree
+from merge_boxes import merge_boxes
+from treeify import generate_tree
 import json, os
 
 from PyPDF2 import PdfMerger
@@ -107,8 +108,8 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
     with open('preprocessing_pipeline/output_files/PDF/pdf_tree_data_pymupdf.json', 'w') as f:
         json.dump(pdf_tree_pymupdf, f, indent=4)
 
-    return merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf
+    return new_layout_data_pdfplumber, new_layout_data_pymupdf, pdf_tree_pdfplumber, pdf_tree_pymupdf
 
 if __name__ == "__main__":
-    merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf = process_pdf("preprocessing_pipeline/documents/autonomic-markers.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=True)
+    new_layout_data_pdfplumber, new_layout_data_pymupdf, pdf_tree_pdfplumber, pdf_tree_pymupdf = process_pdf("preprocessing_pipeline/documents/autonomic-markers.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=False)
 
