@@ -5,6 +5,23 @@ from pdfplumber_functions import extract_words_from_pdf, generate_and_display_im
 from merge_boxes import merge_boxes, generate_tree
 import json, os
 
+from PyPDF2 import PdfMerger
+
+def merge_pdfs(dir_path, output_filename, prefix):
+    merger = PdfMerger()
+
+    for item in sorted(os.listdir(dir_path)):
+        if item.endswith('.pdf') and item.startswith(prefix):
+            merger.append(os.path.join(dir_path, item))
+
+    merger.write(dir_path + "\\" + output_filename)
+    merger.close()
+    
+def delete_pdfs(dir_path, prefix):
+    for item in os.listdir(dir_path):
+        if item.endswith('.pdf') and item.startswith(prefix):
+            os.remove(os.path.join(dir_path, item))
+            
 def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_pymupdf=True, generate_images=False):
     lp_all_word_data, pdfplumber_all_words, pymupdf_all_words = [], [], []
     lp_all_layout_data = []
@@ -27,6 +44,10 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
             
             if generate_images:
                 layout_svg = visualize_layout(image, layout, word_data, layout_data, i)
+        
+        if generate_images:
+            merge_pdfs("preprocessing_pipeline/output_files/visuals", "lp_output.pdf", "layout_visualization_page_")
+            delete_pdfs("preprocessing_pipeline/output_files/visuals", "layout_visualization_page_")
 
         with open('preprocessing_pipeline/output_files/PDF/lp_output_words.json', 'w') as f:
             json.dump(lp_all_word_data, f, indent=4)
@@ -89,5 +110,5 @@ def process_pdf(pdf_file_path, use_layoutparser=True, use_pdfplumber=True, use_p
     return merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf
 
 if __name__ == "__main__":
-    merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf = process_pdf("preprocessing_pipeline/documents/complex.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=True)
+    merged_boxes_pdfplumber, new_layout_data_pdfplumber, merged_boxes_pymupdf, new_layout_data_pymupdf = process_pdf("preprocessing_pipeline/documents/autonomic-markers.pdf", use_layoutparser=True, use_pdfplumber=True, use_pymupdf=False, generate_images=True)
 
