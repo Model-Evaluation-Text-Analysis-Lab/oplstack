@@ -204,7 +204,7 @@ def visualize_layout(image, layout, word_data, layout_data, i):
     #     color = 'orange'  # set the color in RGB format
     #     currentAxis.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1, fill=None, edgecolor=color, linewidth=2))
 
-    output_filename = f'preprocessing_pipeline/output_files/visuals/layout_visualization_page_{i+1}.pdf'
+    output_filename = f'preprocessing_pipeline/output_files/visuals/layout_visualization_page_{str(i+1).zfill(2)}.pdf'
     plt.savefig(output_filename, bbox_inches='tight', pad_inches = 0)
     plt.close()
 
