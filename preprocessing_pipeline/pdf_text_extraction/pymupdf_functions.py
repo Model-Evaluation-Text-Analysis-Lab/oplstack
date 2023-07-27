@@ -3,7 +3,6 @@ from PIL import Image, ImageDraw
 import json
 import os
 import uuid
-import cairosvg
 
 def extract_words_from_pdf_pymupdf(pdf_path):
     all_words = []
